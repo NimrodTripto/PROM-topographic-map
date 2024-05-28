@@ -1,0 +1,26 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load the image
+image_path = 'contour_image.png'  # Replace with the path to your image
+image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+# Apply a binary threshold to get a binary image
+_, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+
+# Find contours
+contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+# Draw contours on the original image (for visualization)
+image_contours = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+cv2.drawContours(image_contours, contours, -1, (0, 255, 0), 2)
+
+# Display the image with contours
+plt.imshow(image_contours)
+plt.title('Contours')
+plt.show()
+
+# Print contours for reference
+for i, contour in enumerate(contours):
+    print(f'Contour {i}: {contour}')
