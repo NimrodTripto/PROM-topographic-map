@@ -92,12 +92,12 @@ def algorithmic(contours):
     # so that it will be able, in the end, to model the map
 
     # pass all the closed contours to a given dictionary, while numbering the contours by some order
-    closed_contours = {}
+    contour_dict = {}
     for i, contour in enumerate(contours):
-        closed_contours[i] = contour
+        contour_dict[i] = contour
     
     # get a dictionary of contours with heights for closed contours
-    contour_with_heights = calculate_heights(closed_contours) # dict format is {contour_number: (height, contour)}
+    contour_with_heights = calculate_heights(contour_dict) # dict format is {contour_number: (height, contour)}
 
     # print the dictionary of contours with heights
     print(contour_with_heights)

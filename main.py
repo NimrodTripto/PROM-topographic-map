@@ -10,9 +10,11 @@ import pyvista as pv
 import os
 import sys
 import random
+import algorithmic
 
 
-IMG = 'images\map_big.jpg'
+IMG2 = 'images\map_big.jpg'
+IMG = 'images\map2.jpg'
 
 def image_to_contours(img):
     pass
@@ -94,9 +96,11 @@ def remove_duplicate_contours(contours, threshold=0.05):
 
             # Find the intersection of the binary masks
             intersection = cv2.bitwise_and(black_image1, black_image2)
-
+            
             # Calculate area of intersection
             intersection_area = np.count_nonzero(intersection)
+            if(i==0 or j==1):
+                print()
             # Check if intersection area exceeds threshold for both contours
             if intersection_area < (1+threshold)*intersection_area_j and intersection_area > (1-threshold)*intersection_area_i:
                 # Add contour indices to remove list
@@ -115,19 +119,26 @@ def main():
     dilated = dilate_img(binary)
     eroded = erode_img(dilated)
 
+    # cv2.imshow('Contours', eroded)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
     contours = find_contours(eroded)
     # plot every contour using cv
     print(len(contours))
     contours_after = remove_duplicate_contours(contours)
     print(len(contours_after))
 
-
+    #i==0,
     white_img = cv2.imread('images\white_img.jpg')
     for (i,contour) in enumerate(contours):
-        cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+        if(i==0 or i==1):
+            cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
     cv2.imshow('Contours', white_img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    algorithmic.algorithmic(contours_after)
 
 
 
