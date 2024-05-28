@@ -14,6 +14,31 @@ import random
 
 IMG = 'images\map_big.jpg'
 
+def image_to_contours(img):
+    pass
+
+def image_to_binary_sens(img):
+    # Convert image to binary more sensitive using adaptive thresholding
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                   cv2.THRESH_BINARY_INV, 11, 20)
+    return binary
+
+def get_highest_point(contours):
+    # Get highest point from console
+    print("Enter the highest point: ")
+    highest_point = int(input())
+    return highest_point
+
+def generate_lines(highest_point):
+    # Generate 360 lines from highest point to ends
+    lines = []
+    for i in range(0, 360):
+        lines.append((highest_point, i))
+    return lines
+
+def random_dash_pattern():
+    return [random.randint(5, 10), random.randint(2, 5)]
 
 def get_image():
     # Get image from memory
@@ -37,16 +62,6 @@ def erode_img(img):
     # Perform dilation
     eroded_image = cv2.erode(img, kernel, iterations=2)
     return eroded_image
-
-def image_to_contours(img):
-    pass
-
-def image_to_binary_sens(img):
-    # Convert image to binary more sensitive using adaptive thresholding
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                   cv2.THRESH_BINARY_INV, 11, 20)
-    return binary
 
 def find_contours(binary):
     # Find contours, but merge very close contours
@@ -93,22 +108,6 @@ def remove_duplicate_contours(contours, threshold=0.05):
     unique_contours = [contours[i] for i in range(len(contours)) if i not in remove_indices]
 
     return unique_contours
-
-def get_highest_point(contours):
-    # Get highest point from console
-    print("Enter the highest point: ")
-    highest_point = int(input())
-    return highest_point
-
-def generate_lines(highest_point):
-    # Generate 360 lines from highest point to ends
-    lines = []
-    for i in range(0, 360):
-        lines.append((highest_point, i))
-    return lines
-
-def random_dash_pattern():
-    return [random.randint(5, 10), random.randint(2, 5)]
 
 def main():
     img = get_image()
