@@ -11,10 +11,13 @@ import os
 import sys
 import random
 import algorithmic
+import math
+import statistics
 
-
-IMG2 = 'images\map_big.jpg'
-IMG = 'images\map2.jpg'
+DEBUG = False
+IMG1 = 'images\map_small.png'
+IMG = 'images\map_small.png'
+IMG2 = 'images\map2.jpg'
 
 def image_to_contours(img):
     pass
@@ -70,8 +73,52 @@ def find_contours(binary):
     contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     return contours
 
+def intersection_test1(contour1,contour2,height, width,debug = False, threshold=0.1):
+    intersection_area_i = cv2.contourArea(cv2.convexHull(contour1))
+    intersection_area_j = cv2.contourArea(cv2.convexHull(contour2))
+    contour1 = contour1.astype(np.int32)
+    contour2 = contour2.astype(np.int32)
+
+    # Find convex hulls of the contours
+    hull1 = cv2.convexHull(contour1)
+    hull2 = cv2.convexHull(contour2)
+    black_image1,black_image2 = np.zeros((height, width), dtype=np.uint8),np.zeros((height, width), dtype=np.uint8)
+
+    cv2.drawContours(black_image1, [hull1], -1, 255, thickness=cv2.FILLED)
+    cv2.drawContours(black_image2, [hull2], -1, 255, thickness=cv2.FILLED)
+    
+
+    # Find the intersection of the binary masks
+    intersection = cv2.bitwise_and(black_image1, black_image2)
+    
+    # Calculate area of intersection
+    intersection_area = np.count_nonzero(intersection)
+    if(debug):
+        print(intersection_area_i,intersection_area_j,intersection_area)
+        cv2.imshow('Contours', black_image1)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        cv2.imshow('Contours', intersection)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    # Check if intersection area exceeds threshold for both contours
+    if intersection_area < (1+threshold)*intersection_area_j and intersection_area < (1+threshold)*intersection_area_i:
+        if intersection_area > (1-threshold)*intersection_area_j and intersection_area > (1-threshold)*intersection_area_i:
+            return True
+    return False
+
+def intersection_test2(contour1,contour2):
+    all_contour1_points = [pt[0] for pt in contour1]
+    contour2_points = random.sample(range(len(contour2)), 10)
+    all_dists = []
+    for pt_i in contour2_points:
+        all_dists.append(min(math.dist(point,contour2[pt_i][0]) for point in all_contour1_points))
+    return statistics.mean(all_dists)<10
+
+
+
 # Remove duplicate contours based on intersection area threshold
-def remove_duplicate_contours(contours, threshold=0.05):
+def remove_duplicate_contours(contours, threshold=0.1):
     # Indices of contours to be removed
     remove_indices = []
     white_img = cv2.imread('images\white_img.jpg')
@@ -80,34 +127,11 @@ def remove_duplicate_contours(contours, threshold=0.05):
     # Compare each pair of contours
     for i in range(len(contours)):
         for j in range(i + 1, len(contours)):
-            intersection_area_i = cv2.contourArea(cv2.convexHull(contours[i]))
-            intersection_area_j = cv2.contourArea(cv2.convexHull(contours[j]))
-            contour1 = contours[i].astype(np.int32)
-            contour2 = contours[j].astype(np.int32)
+            if (intersection_test1(contours[i],contours[j],height, width) or intersection_test2(contours[i],contours[j])):
+                    remove_indices.append(i)
+                
 
-            # Find convex hulls of the contours
-            hull1 = cv2.convexHull(contour1)
-            hull2 = cv2.convexHull(contour2)
-            black_image1,black_image2 = np.zeros((height, width), dtype=np.uint8),np.zeros((height, width), dtype=np.uint8)
-
-            cv2.drawContours(black_image1, [hull1], -1, 255, thickness=cv2.FILLED)
-            cv2.drawContours(black_image2, [hull2], -1, 255, thickness=cv2.FILLED)
-            
-
-            # Find the intersection of the binary masks
-            intersection = cv2.bitwise_and(black_image1, black_image2)
-            
-            # Calculate area of intersection
-            intersection_area = np.count_nonzero(intersection)
-            if(i==0 or j==1):
-                print()
-            # Check if intersection area exceeds threshold for both contours
-            if intersection_area < (1+threshold)*intersection_area_j and intersection_area > (1-threshold)*intersection_area_i:
-                # Add contour indices to remove list
-                #print(f"found {i}, {j}",end=' | ')
-                remove_indices.append(i)
-
-    print(remove_indices)
+    # print(remove_indices)
     # Remove duplicate contours
     unique_contours = [contours[i] for i in range(len(contours)) if i not in remove_indices]
 
@@ -129,16 +153,23 @@ def main():
     contours_after = remove_duplicate_contours(contours)
     print(len(contours_after))
 
-    #i==0,
+    #i==4
     white_img = cv2.imread('images\white_img.jpg')
-    for (i,contour) in enumerate(contours):
-        if(i==0 or i==1):
+    if(DEBUG):
+        for (i,contour) in enumerate(contours):
+            if(i==5 or i==4):
+                cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+        cv2.imshow('Contours', white_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        for (i,contour) in enumerate(contours_after):
             cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-    cv2.imshow('Contours', white_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        # cv2.imshow('Contours', white_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
-    algorithmic.algorithmic(contours_after)
+    algorithmic.algorithmic(contours_after, img.shape[:2])
 
 
 
