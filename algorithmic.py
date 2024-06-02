@@ -182,7 +182,7 @@ def calculate_heights(contours, img_shape, initial_height=INITIAL_HGT):
     for i, contour in contours.items():
         if is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
             num_contained_contours = count_contained_contours(contour, contours)
-            height = initial_height - DIFF * num_contained_contours
+            height = initial_height - DIFF * num_contained_contours # fix
             contour_with_heights[i] = (height, contour)
             print(f"Contour {i} has height {height}")
     
