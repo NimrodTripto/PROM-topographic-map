@@ -158,18 +158,18 @@ def main():
     img = get_image()
     binary = image_to_binary_sens(img)
     curr_img = binary
-    cv2.imshow('Contours', curr_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    # curr_img = dilate_img(curr_img,(2,2),2)
     # cv2.imshow('Contours', curr_img)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
-    curr_img = close_img(curr_img,(1,7),3)
-    cv2.imshow('Contours', curr_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    # curr_img = erode_img(curr_img)
+    curr_img = dilate_img(curr_img,(2,2),2)
+    # cv2.imshow('Contours', curr_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # curr_img = close_img(curr_img,(1,7),3)
+    # cv2.imshow('Contours', curr_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    curr_img = erode_img(curr_img)
     
     # cv2.imshow('Contours', curr_img)
     # cv2.waitKey(0)
@@ -206,7 +206,7 @@ def main():
     #     cv2.waitKey(0)
     #     cv2.destroyAllWindows()
 
-    # #algorithmic.algorithmic(contours_after, img.shape[:2])
+    # algorithmic.algorithmic(contours_after, img.shape[:2])
 
 
 
