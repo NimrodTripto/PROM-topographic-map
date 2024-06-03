@@ -18,7 +18,7 @@ import argparse
 DEBUG = False
 IMG1 = 'images\map_small.png'
 IMG1 = 'images\map_big.jpg'
-IMG = 'images\map_hand1.jpg'
+IMG = 'images\map_hand2.jpg'
 IMG1 = 'images\map2.jpg'
 
 def image_to_contours(img):
@@ -122,15 +122,23 @@ def intersection_test1(contour1,contour2,height, width,debug = False, threshold=
             return True
     return False
 
-def intersection_test2(contour1,contour2):
-    all_contour1_points = [pt[0] for pt in contour1]
-    if(len(contour2)>=10):
-        contour2_points = random.sample(range(len(contour2)), 10)
+def try_sample(contour,num_sample):
+    if(len(contour)>=num_sample):
+        contour_points = random.sample(range(len(contour)), num_sample)
     else:
-        contour2_points = random.sample(range(len(contour2)), len(contour2))
+        contour_points = random.sample(range(len(contour)), len(contour))
+    return contour_points
+
+def intersection_test2(contour1,contour2):
+    # all_contour1_points = [pt[0] for pt in contour1]
+    # contour1_points = try_sample(contour1,100)
+    contour2_points = try_sample(contour2,10)
     all_dists = []
     for pt_i in contour2_points:
-        all_dists.append(min(math.dist(point,contour2[pt_i][0]) for point in all_contour1_points))
+        curr_dist = min(math.dist(contour1[pt_j][0],contour2[pt_i][0]) for pt_j in range(len(contour1)))
+        all_dists.append(curr_dist)
+        if(curr_dist>40):
+            return False
     return statistics.mean(all_dists)<10
 
 
@@ -145,8 +153,33 @@ def remove_duplicate_contours(contours, threshold=0.1):
     # Compare each pair of contours
     for i in range(len(contours)):
         for j in range(i + 1, len(contours)):
-            if (intersection_test1(contours[i],contours[j],height, width) or intersection_test2(contours[i],contours[j])):
-                    remove_indices.append(i)
+            # if (intersection_test1(contours[i],contours[j],height, width) or intersection_test2(contours[i],contours[j])):
+            # if (intersection_test1(contours[i],contours[j],height, width)):
+            #         remove_indices.append(i)
+            # elif (intersection_test2(contours[i],contours[j])):
+            #     remove_indices.append(i)
+            if (intersection_test2(contours[i],contours[j])):
+                remove_indices.append(i)
+                
+
+    # print(remove_indices)
+    # Remove duplicate contours
+    unique_contours = [contours[i] for i in range(len(contours)) if i not in remove_indices]
+
+    return unique_contours
+
+# Remove duplicate contours based on intersection area threshold
+def remove_small_contours(contours, threshold=10):
+    # Indices of contours to be removed
+    remove_indices = []
+    white_img = cv2.imread('images\white_img.jpg')
+    height, width = white_img.shape[:2]
+
+    # Compare each pair of contours
+    for i in range(len(contours)):
+        contour_area = cv2.contourArea(cv2.convexHull(contours[i]))
+        if (contour_area<threshold):
+                remove_indices.append(i)
                 
 
     # print(remove_indices)
@@ -159,55 +192,35 @@ def main(img_path):
     img = get_image(img_path)
     binary = image_to_binary_sens(img)
     curr_img = binary
-    # cv2.imshow('Contours', curr_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
     curr_img = dilate_img(curr_img,(2,2),2)
+    curr_img = erode_img(curr_img,(2,2),2)
     # cv2.imshow('Contours', curr_img)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
-    # curr_img = close_img(curr_img,(1,7),3)
-    # cv2.imshow('Contours', curr_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    curr_img = erode_img(curr_img)
-    
-    # cv2.imshow('Contours', curr_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    # curr_img = erode_img(curr_img)
-    # cv2.imshow('Contours', curr_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    # curr_img = dilate_img(curr_img)
-
-    # cv2.imshow('Contours', curr_img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-
     contours = find_contours(curr_img)
-    # # plot every contour using cv
-    # print(len(contours))
-    contours_after = remove_duplicate_contours(contours)
-    # print(len(contours_after))
+    # plot every contour using cv
+    print(len(contours))
+    contours_after = remove_duplicate_contours(remove_small_contours(contours,10))
+    # contours_after = contours
+    print(len(contours_after))
 
-    # #i==4
-    # white_img = cv2.imread('images\white_img.jpg')
-    # if(DEBUG):
-    #     for (i,contour) in enumerate(contours):
-    #         if(i==5 or i==4):
-    #             cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-    #     cv2.imshow('Contours', white_img)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
-    # else:
-    #     for (i,contour) in enumerate(contours_after):
-    #         cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-    #     cv2.imshow('Contours', white_img)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
+    #i==4
+    white_img = cv2.imread('images\white_img.jpg')
+    if(DEBUG):
+        for (i,contour) in enumerate(contours):
+            if(i==5 or i==4):
+                cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+        cv2.imshow('Contours', white_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        for (i,contour) in enumerate(contours_after):
+            cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+        # cv2.imshow('Contours', white_img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
-    algorithmic(contours_after, img.shape[:2])
+    # algorithmic.algorithmic(contours_after, img.shape[:2])
 
 
 
