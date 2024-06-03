@@ -94,37 +94,42 @@ def return_contained_contours(contour, all_contours):
                 contained_contours.append(idx)
     return contained_contours
 
-def try_find_son_contour(contour, contour_index, contour_dict, father_contours):
-    contained_contours = return_contained_contours(contour, contour_dict)
-    if len(contained_contours) == 1:
-        return contained_contours[0]
-    elif len(contained_contours) > 1:
-        for c in contained_contours:
-            if c not in father_contours:
-                return c
+def find_father_contour(contour, contour_index, contour_dict, father_contours):
+    # We'll go over all contours, if we find a contour that i'm his son and not his grandson then he is my father
+    for i, other_contour in contour_dict.items():
+        if i != contour_index:
+            if cv2.pointPolygonTest(other_contour, (int(contour[0][0][0]), int(contour[0][0][1])), False) == 1.0:
+                if not am_i_grandson(contour_index, i, contour_dict):
+                    return i
     return None
-    
+
+def am_i_grandson(contour_index_1, contour_index_2, contour_dict):  # this function checks if contour 1 is a grandson of contour 2
+    contained_in_2 = return_contained_contours(contour_dict[contour_index_2], contour_dict)
+    for contained in contained_in_2:
+        # for each contour contained in contour 2, check if it contains contour 1
+        if cv2.pointPolygonTest(contour_dict[contained], (int(contour_dict[contour_index_1][0][0][0]), int(contour_dict[contour_index_1][0][0][1])), False) == 1.0:
+            return True
+    return False
+
 def generate_fathers_dict(contour_dict):
     # We'll use a dictionary to store only the direct father of each contour
-    father_dict = {}  # dict of the shape {contour_number: father_contour_number} 
-    while len(father_dict) + 1 != len(contour_dict):
-        for i, contour in contour_dict.items():
-            son_contour = try_find_son_contour(contour, i, contour_dict, father_dict)
-            if son_contour is not None:
-                father_dict[son_contour] = i
+    father_dict = {}  # dict of the shape {contour_number: father_contour_number}
+    for i, contour in contour_dict.items():
+        father_contour = find_father_contour(contour, i, contour_dict, father_dict)
+        if father_contour is not None:
+            father_dict[i] = father_contour
     return father_dict
 
-def father_to_heights(father_dict, initial_height=INITIAL_HGT):
+def count_fathers(contour_index, father_dict):
+    if contour_index not in father_dict.keys():
+        return 0
+    return 1 + count_fathers(father_dict[contour_index], father_dict)
+
+def father_to_heights(father_dict, contour_dict):
     # We'll use a dictionary to store the height of each contour
     height_dict = {}  # dict of the shape {contour_number: height}
-    # Assign heights to the top contours. We know a contour is a top contour if it is no one's father
-    for i, father in father_dict.items():
-        if i not in father_dict.values():
-            height_dict[i] = initial_height
-    while len(height_dict) != len(father_dict) + 1:  # +1 because the top contour is not in the father_dict
-        for i, father in father_dict.items():
-            if i in height_dict:
-                height_dict[father] = height_dict[i] - DIFF
+    for i in contour_dict.keys():
+        height_dict[i] = DIFF * count_fathers(i, father_dict) + DIFF
     return height_dict
 
 def zip_contours_with_heights(contours, heights):
@@ -225,13 +230,13 @@ def algorithmic(contours, img_shape):
         if len(contour) > 1 and is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
             contour_dict[i] = contour  
 
-    plot_all_contours(contour_dict)
-
     # get a dictionary of contour_index: father_index
     father_dict = generate_fathers_dict(contour_dict)
 
+    plot_all_contours(contour_dict)
+
     # translate father_dict to a dictionary of contour_index: height
-    contour_heights = father_to_heights(father_dict)  # dict of the shape {contour_number: height}
+    contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
 
     # zip the contours with their heights
     contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)

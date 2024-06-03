@@ -177,3 +177,31 @@
 
 #     # Show the plot
 #     plotter.show()
+
+    # # Assign heights to the top contours. We know a contour is a top contour if it is no one's father
+    # print(f"Num bases: {num_bases}")
+    # for i, father in father_dict.items():
+    #     if i not in father_dict.values():
+    #         height_dict[i] = initial_height
+    # while len(height_dict) != len(father_dict) + num_bases:  # +1 because the top contour is not in the father_dict
+    #     for i, father in father_dict.items():
+    #         if i in height_dict:
+    #             height_dict[father] = height_dict[i] - DIFF
+    #     # print(f"Height dict: {height_dict}")
+    # return height_dict
+
+
+# def try_find_son_contour(contour, contour_index, contour_dict, father_contours):
+#     if contour_index in father_contours.values():
+#         return None
+#     contained_contours = return_contained_contours(contour, contour_dict)
+#     if len(contained_contours) == 1:
+#         return contained_contours[0]
+#     elif len(contained_contours) > 1:
+#         list = []
+#         for c in contained_contours:
+#             if c not in father_contours:
+#                 list.append(c)
+#         if len(list) == 1:
+#             return list[0]
+#     return None
