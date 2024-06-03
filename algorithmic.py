@@ -164,20 +164,14 @@ def count_contained_contours(contour, all_contours):
                     raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
             
                 point = (int(other_contour[0][0][0]), int(other_contour[0][0][1]))
-                # print(f"Testing point {point} on contour with shape {contour.shape}")
-
-                # if idx == 0:
-                #     plot_contour_and_points(contour, [point], [cv2.pointPolygonTest(contour, point, False)])
 
                 result = cv2.pointPolygonTest(contour, point, False)
-                # print(f"pointPolygonTest result for point {point}: {result}")
 
                 if result == 1.0:
                     count += 1
         return count
 
-
-def calculate_heights(contours, img_shape, initial_height=INITIAL_HGT):
+def calculate_heights_old(contours, img_shape, initial_height=INITIAL_HGT):
     contour_with_heights = {}
     for i, contour in contours.items():
         if is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
@@ -188,7 +182,25 @@ def calculate_heights(contours, img_shape, initial_height=INITIAL_HGT):
     
     return contour_with_heights
 
+def calculate_heights(contours, img_shape, initial_height=INITIAL_HGT):
+    contour_with_heights = {}
+    assigned_contours = {}
+    # Assign tops with initial height
+    for i, contour in contours.items():
+        if is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
+            num_contained_contours = count_contained_contours(contour, contours)
+            if num_contained_contours == 0:
+                height = initial_height
+                assigned_contours.add(i)
+            else:
+                height = -1
+            contour_with_heights[i] = (height, contour)
 
+    # Assign heights to the rest of the contours
+    while len(assigned_contours) != 
+        
+    
+    return contour_with_heights
 
 def plot_3d_model_from_dict(contours_with_heights, diff=DIFF):
     # Initialize the plotter
