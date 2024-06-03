@@ -10,9 +10,10 @@ import pyvista as pv
 import os
 import sys
 import random
-#import algorithmic
+from algorithmic import algorithmic
 import math
 import statistics
+import argparse
 
 DEBUG = False
 IMG1 = 'images\map_small.png'
@@ -46,9 +47,9 @@ def generate_lines(highest_point):
 def random_dash_pattern():
     return [random.randint(5, 10), random.randint(2, 5)]
 
-def get_image():
+def get_image(image=IMG):
     # Get image from memory
-    img = cv2.imread(IMG)
+    img = cv2.imread(image)
     return img
 
 def image_to_binary(img):
@@ -154,8 +155,8 @@ def remove_duplicate_contours(contours, threshold=0.1):
 
     return unique_contours
 
-def main():
-    img = get_image()
+def main(img_path):
+    img = get_image(img_path)
     binary = image_to_binary_sens(img)
     curr_img = binary
     # cv2.imshow('Contours', curr_img)
@@ -184,10 +185,10 @@ def main():
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    # contours = find_contours(curr_img)
+    contours = find_contours(curr_img)
     # # plot every contour using cv
     # print(len(contours))
-    # contours_after = remove_duplicate_contours(contours)
+    contours_after = remove_duplicate_contours(contours)
     # print(len(contours_after))
 
     # #i==4
@@ -206,9 +207,18 @@ def main():
     #     cv2.waitKey(0)
     #     cv2.destroyAllWindows()
 
-    # algorithmic.algorithmic(contours_after, img.shape[:2])
+    algorithmic(contours_after, img.shape[:2])
 
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Process an image to find contours.')
+    parser.add_argument('image_path', type=str, help='Path to the input image')
+    args = parser.parse_args()
+
+    img = cv2.imread(args.image_path)
+    if img is None:
+        print(f"Error: Unable to load image from path {args.image_path}")
+        sys.exit(1)
+    main(args.image_path)
+    
