@@ -8,6 +8,8 @@ import random
 import math
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
+from scipy.spatial import Delaunay
+import matplotlib.path as mplPath
 
 
 INITIAL_HGT = 3000
@@ -136,82 +138,46 @@ def zip_contours_with_heights(contours, heights):
     return {i: (heights[i], contour) for i, contour in contours.items()}
 
 def create_pyvista_mesh(contours_with_heights, diff=DIFF):
-    """
-    Create a pyvista mesh object from the contours with heights, including roofs and floors.
-
-    Parameters:
-    contours_with_heights (dict): Dictionary containing contours and their respective heights.
-
-    Returns:
-    pv.PolyData: PyVista PolyData mesh object.
-    """
     all_points = []
     faces = []
 
     for height, contour in contours_with_heights.values():
         points = contour.squeeze()
 
-        # Top height points
-        z_values_top = np.full((points.shape[0], 1), height)
-        points_top = np.hstack((points, z_values_top))
+        # Create Delaunay triangulation for the top and bottom surfaces
+        delaunay = Delaunay(points)
+        path = mplPath.Path(points)
 
-        # Bottom height points
-        z_values_bottom = np.full((points.shape[0], 1), height - diff)
-        points_bottom = np.hstack((points, z_values_bottom))
+        top_points = np.hstack((points, np.full((points.shape[0], 1), height)))
+        bottom_points = np.hstack((points, np.full((points.shape[0], 1), height - diff)))
 
-        num_points = points_top.shape[0]
+        top_indices = range(len(all_points), len(all_points) + len(top_points))
+        all_points.extend(top_points)
+        bottom_indices = range(len(all_points), len(all_points) + len(bottom_points))
+        all_points.extend(bottom_points)
 
-        # Add points to all_points list and keep track of indices
-        top_indices = []
-        bottom_indices = []
-        for pt in points_top:
-            top_indices.append(len(all_points))
-            all_points.append(pt)
-        for pt in points_bottom:
-            bottom_indices.append(len(all_points))
-            all_points.append(pt)
+        for simplex in delaunay.simplices:
+            if path.contains_point(points[simplex].mean(axis=0)):
+                faces.append([3, top_indices[simplex[0]], top_indices[simplex[1]], top_indices[simplex[2]]])
+                faces.append([3, bottom_indices[simplex[0]], bottom_indices[simplex[2]], bottom_indices[simplex[1]]])
 
-        # Create faces for the top and bottom surfaces
-        top_face = [num_points] + top_indices
-        bottom_face = [num_points] + bottom_indices
-        faces.append(top_face)
-        faces.append(bottom_face)
+        for i in range(len(points)):
+            next_i = (i + 1) % len(points)
+            faces.append([4, top_indices[i], top_indices[next_i], bottom_indices[next_i], bottom_indices[i]])
 
-        # Create faces for the vertical sides
-        for i in range(num_points):
-            next_i = (i + 1) % num_points
-            side_face = [4, top_indices[i], top_indices[next_i], bottom_indices[next_i], bottom_indices[i]]
-            faces.append(side_face)
-
-    # Flatten the points and faces list
     all_points = np.array(all_points)
-    faces = np.hstack(faces)
+    faces_flat = np.hstack([np.array(face) for face in faces])
 
-    # Create a PolyData object
     poly = pv.PolyData()
     poly.points = all_points
-    poly.faces = faces
+    poly.faces = faces_flat
 
     return poly
 
 def plot_gradient_mesh(mesh, colormap='viridis'):
-    """
-    Plot the given mesh with gradient colors, axes, and a height map.
-
-    Parameters:
-    mesh (pv.PolyData): The PyVista mesh object to plot.
-    colormap (str): The colormap to use for coloring the mesh.
-    """
-    # Create a plotter object
     plotter = pv.Plotter()
-
-    # Add the mesh to the plotter with a scalar field (height) and the specified colormap
     plotter.add_mesh(mesh, scalars=mesh.points[:, 2], cmap=colormap, show_edges=False)
-    
-    # Add axes
     plotter.show_axes()
-
-    # Show the plot
     plotter.show()
 
 def algorithmic(contours, img_shape):
@@ -227,7 +193,7 @@ def algorithmic(contours, img_shape):
     contour_dict = {}
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
-        if len(contour) > 1 and is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
+        if len(contour) > 1:
             contour_dict[i] = contour  
 
     # get a dictionary of contour_index: father_index
