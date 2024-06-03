@@ -130,62 +130,6 @@ def father_to_heights(father_dict, initial_height=INITIAL_HGT):
 def zip_contours_with_heights(contours, heights):
     return {i: (heights[i], contour) for i, contour in contours.items()}
 
-# def plot_3d_model(contours_with_heights, diff=DIFF):
-#     # Initialize the plotter
-#     plotter = pv.Plotter()
-
-
-def plot_3d_model_from_dict(contours_with_heights, diff=DIFF):
-    # Initialize the plotter
-    plotter = pv.Plotter()
-
-    # Collect all points and faces
-    all_points = []
-    faces = []
-
-    # Loop through the contours and add them to the mesh with the respective heights
-    for height, contour in contours_with_heights.values():
-        points = contour.squeeze()
-
-        # Top height points
-        z_values_top = np.full((points.shape[0], 1), height)
-        points_top = np.hstack((points, z_values_top))
-
-        # Bottom height points
-        z_values_bottom = np.full((points.shape[0], 1), height - diff)
-        points_bottom = np.hstack((points, z_values_bottom))
-
-        num_points = points_top.shape[0]
-
-        # Add points to all_points list and keep track of indices
-        top_indices = []
-        bottom_indices = []
-        for pt in points_top:
-            top_indices.append(len(all_points))
-            all_points.append(pt)
-        for pt in points_bottom:
-            bottom_indices.append(len(all_points))
-            all_points.append(pt)
-
-        # Create faces for the top and bottom surfaces
-        for i in range(num_points):
-            faces.append([4, top_indices[i], top_indices[(i + 1) % num_points], bottom_indices[(i + 1) % num_points], bottom_indices[i]])
-
-    # Flatten the points and faces list
-    all_points = np.array(all_points)
-    faces = np.hstack(faces)
-
-    # Create a PolyData object
-    poly = pv.PolyData()
-    poly.points = all_points
-    poly.faces = faces
-
-    # Add the mesh to the plotter
-    plotter.add_mesh(poly, color='purple', opacity=1.0, show_edges=True)
-
-    # Show the plot
-    plotter.show()
-
 def create_pyvista_mesh(contours_with_heights, diff=DIFF):
     """
     Create a pyvista mesh object from the contours with heights, including roofs and floors.
@@ -223,13 +167,16 @@ def create_pyvista_mesh(contours_with_heights, diff=DIFF):
             all_points.append(pt)
 
         # Create faces for the top and bottom surfaces
-        for i in range(num_points):
-            faces.append([3, top_indices[i], top_indices[(i + 1) % num_points], top_indices[(i + 1) % num_points]])
-            faces.append([3, bottom_indices[i], bottom_indices[(i + 1) % num_points], bottom_indices[(i + 1) % num_points]])
+        top_face = [num_points] + top_indices
+        bottom_face = [num_points] + bottom_indices
+        faces.append(top_face)
+        faces.append(bottom_face)
 
         # Create faces for the vertical sides
         for i in range(num_points):
-            faces.append([4, top_indices[i], top_indices[(i + 1) % num_points], bottom_indices[(i + 1) % num_points], bottom_indices[i]])
+            next_i = (i + 1) % num_points
+            side_face = [4, top_indices[i], top_indices[next_i], bottom_indices[next_i], bottom_indices[i]]
+            faces.append(side_face)
 
     # Flatten the points and faces list
     all_points = np.array(all_points)
@@ -254,7 +201,7 @@ def plot_gradient_mesh(mesh, colormap='viridis'):
     plotter = pv.Plotter()
 
     # Add the mesh to the plotter with a scalar field (height) and the specified colormap
-    plotter.add_mesh(mesh, scalars=mesh.points[:, 2], cmap=colormap, show_edges=True)
+    plotter.add_mesh(mesh, scalars=mesh.points[:, 2], cmap=colormap, show_edges=False)
     
     # Add axes
     plotter.show_axes()

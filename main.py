@@ -199,11 +199,8 @@ def main(img_path):
     # cv2.destroyAllWindows()
     contours = find_contours(curr_img)
     # plot every contour using cv
-    print(len(contours))
     contours_after = remove_duplicate_contours(remove_small_contours(contours,10))
     # contours_after = contours
-    print(len(contours_after))
-
     #i==4
     white_img = cv2.imread('images\white_img.jpg')
     if(DEBUG):
@@ -220,7 +217,7 @@ def main(img_path):
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
 
-    # algorithmic.algorithmic(contours_after, img.shape[:2])
+    algorithmic(contours_after, img.shape[:2])
 
 
 
