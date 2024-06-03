@@ -10,14 +10,15 @@ import pyvista as pv
 import os
 import sys
 import random
-import algorithmic
+#import algorithmic
 import math
 import statistics
 
 DEBUG = False
 IMG1 = 'images\map_small.png'
-IMG = 'images\map_small.png'
-IMG2 = 'images\map2.jpg'
+IMG1 = 'images\map_big.jpg'
+IMG = 'images\map_hand1.jpg'
+IMG1 = 'images\map2.jpg'
 
 def image_to_contours(img):
     pass
@@ -56,17 +57,30 @@ def image_to_binary(img):
     _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
     return binary
 
-def dilate_img(img):
-    kernel = np.ones((3,3), np.uint8)  # You can adjust the size of the kernel as needed
+def dilate_img(img,shape=(2,2),iter=2):
+    kernel = np.ones(shape, np.uint8)  # You can adjust the size of the kernel as needed
     # Perform dilation
-    dilated_image = cv2.dilate(img, kernel, iterations=2)
+    dilated_image = cv2.dilate(img, kernel, iterations=iter)
     return dilated_image
 
-def erode_img(img):
-    kernel = np.ones((3,3), np.uint8)  # You can adjust the size of the kernel as needed
+def erode_img(img,shape=(2,2),iter=2):
+    kernel = np.ones(shape, np.uint8)  # You can adjust the size of the kernel as needed
     # Perform dilation
-    eroded_image = cv2.erode(img, kernel, iterations=2)
+    eroded_image = cv2.erode(img, kernel, iterations=iter)
     return eroded_image
+
+def close_img(img,shape=(2,2),iter=2):
+    kernel = np.ones(shape, np.uint8)  # You can adjust the size of the kernel as needed
+    # Perform dilation
+    closed_img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel, iterations=iter)
+    return closed_img
+
+def open_img(img,shape=(2,2),iter=2):
+    kernel = np.ones(shape, np.uint8)  # You can adjust the size of the kernel as needed
+    # Perform dilation
+    opened_img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=iter)
+    return opened_img
+
 
 def find_contours(binary):
     # Find contours, but merge very close contours
@@ -109,7 +123,10 @@ def intersection_test1(contour1,contour2,height, width,debug = False, threshold=
 
 def intersection_test2(contour1,contour2):
     all_contour1_points = [pt[0] for pt in contour1]
-    contour2_points = random.sample(range(len(contour2)), 10)
+    if(len(contour2)>=10):
+        contour2_points = random.sample(range(len(contour2)), 10)
+    else:
+        contour2_points = random.sample(range(len(contour2)), len(contour2))
     all_dists = []
     for pt_i in contour2_points:
         all_dists.append(min(math.dist(point,contour2[pt_i][0]) for point in all_contour1_points))
@@ -140,36 +157,56 @@ def remove_duplicate_contours(contours, threshold=0.1):
 def main():
     img = get_image()
     binary = image_to_binary_sens(img)
-    dilated = dilate_img(binary)
-    eroded = erode_img(dilated)
+    curr_img = binary
+    cv2.imshow('Contours', curr_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    # curr_img = dilate_img(curr_img,(2,2),2)
+    # cv2.imshow('Contours', curr_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    curr_img = close_img(curr_img,(1,7),3)
+    cv2.imshow('Contours', curr_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    # curr_img = erode_img(curr_img)
+    
+    # cv2.imshow('Contours', curr_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # curr_img = erode_img(curr_img)
+    # cv2.imshow('Contours', curr_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # curr_img = dilate_img(curr_img)
 
-    # cv2.imshow('Contours', eroded)
+    # cv2.imshow('Contours', curr_img)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
 
-    contours = find_contours(eroded)
-    # plot every contour using cv
-    print(len(contours))
-    contours_after = remove_duplicate_contours(contours)
-    print(len(contours_after))
+    # contours = find_contours(curr_img)
+    # # plot every contour using cv
+    # print(len(contours))
+    # contours_after = remove_duplicate_contours(contours)
+    # print(len(contours_after))
 
-    #i==4
-    white_img = cv2.imread('images\white_img.jpg')
-    if(DEBUG):
-        for (i,contour) in enumerate(contours):
-            if(i==5 or i==4):
-                cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-        cv2.imshow('Contours', white_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-    else:
-        for (i,contour) in enumerate(contours_after):
-            cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-        # cv2.imshow('Contours', white_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    # #i==4
+    # white_img = cv2.imread('images\white_img.jpg')
+    # if(DEBUG):
+    #     for (i,contour) in enumerate(contours):
+    #         if(i==5 or i==4):
+    #             cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+    #     cv2.imshow('Contours', white_img)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    # else:
+    #     for (i,contour) in enumerate(contours_after):
+    #         cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+    #     cv2.imshow('Contours', white_img)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
 
-    algorithmic.algorithmic(contours_after, img.shape[:2])
+    # #algorithmic.algorithmic(contours_after, img.shape[:2])
 
 
 
