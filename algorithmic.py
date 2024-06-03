@@ -11,30 +11,9 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 
 
 INITIAL_HGT = 3000
-DIFF = 50
+DIFF = 10
 THRESH = 2.0
 THRESH_CLOSED = 0.0
-
-
-# def is_contour_closed(contour, threshold=THRESH):
-#     """
-#     Check if the contour is closed.
-
-#     Parameters:
-#     contour (np.ndarray): The contour to check.
-#     threshold (float): The threshold to consider the contour closed.
-
-#     Returns:
-#     bool: True if the contour is closed, False otherwise.
-#     """
-#     # Calculate the arc length of the contour assuming it's closed
-#     closed_arc_length = cv2.arcLength(contour, True)
-    
-#     # Calculate the arc length of the contour assuming it's open
-#     open_arc_length = cv2.arcLength(contour, False)
-    
-#     # The contour is closed if the arc lengths are approximately equal
-#     return abs(closed_arc_length - open_arc_length) < threshold
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
     """
@@ -65,38 +44,6 @@ def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
 
     return True
 
-# def is_contour_closed3(contour, X_MAX=1000, Y_MAX=1000):
-#     """
-#     Check if the contour is closed based on the mean point and the furthest point.
-
-#     Parameters:
-#     contour (np.ndarray): The contour to check.
-#     X_MAX (float): The maximum x-coordinate value.
-#     Y_MAX (float): The maximum y-coordinate value.
-
-#     Returns:
-#     bool: True if the contour is closed, False otherwise.
-#     """
-#     # Ensure contour shape is (N, 1, 2)
-#     contour_points = contour.squeeze()  # Shape (N, 2)
-
-#     # Calculate the mean point of the contour
-#     mean_point = np.mean(contour_points, axis=0)
-#     xm, ym = mean_point
-
-#     # Find the furthest point from the mean point
-#     distances = np.linalg.norm(contour_points - mean_point, axis=1)
-#     max_index = np.argmax(distances)
-#     d = distances[max_index]
-
-#     # Check the conditions for closure
-#     if (xm - 0)**2 <= d**2 or (xm - X_MAX)**2 <= d**2:
-#         return True
-#     if (ym - 0)**2 <= d**2 or (ym - Y_MAX)**2 <= d**2:
-#         return True
-
-#     return False
-
 def is_valid_contour_shape(array):
     """
     Check if the given array is of shape (N, 1, 2).
@@ -115,26 +62,6 @@ def is_valid_contour_shape(array):
         return False
     return True
 
-
-def plot_contour_and_points(contour, points, results):
-    """
-    Plot the contour and the points being tested.
-
-    Parameters:
-    contour (np.ndarray): The contour to plot.
-    points (list of tuples): The points being tested.
-    results (list of float): The results of pointPolygonTest for each point.
-    """
-    plt.figure()
-    contour_points = contour.squeeze()
-    plt.plot(contour_points[:, 0], contour_points[:, 1], 'b-', label='Contour')
-    for point, result in zip(points, results):
-        color = 'r' if result == 1.0 else 'g'
-        plt.plot(point[0], point[1], marker='o', color=color)
-    plt.legend()
-    plt.show()
-
-
 def plot_all_contours(contours):
     """
     Plot all contours in the given dictionary.
@@ -152,55 +79,59 @@ def plot_all_contours(contours):
     plt.title('All Contours')
     plt.show()
 
-
-def count_contained_contours(contour, all_contours):
-        if not is_valid_contour_shape(contour):
-            raise ValueError(f"Contour format is incorrect. Expected shape is (N, 1, 2). Got shape {contour.shape}")
-
-        count = 0
-        for idx, other_contour in all_contours.items():
-            if other_contour is not contour:
-                if not is_valid_contour_shape(other_contour):
-                    raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
+def return_contained_contours(contour, all_contours):
+    contained_contours = []
+    for idx, other_contour in all_contours.items():
+        if other_contour is not contour:
+            if not is_valid_contour_shape(other_contour):
+                raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
             
-                point = (int(other_contour[0][0][0]), int(other_contour[0][0][1]))
+            point = (int(other_contour[0][0][0]), int(other_contour[0][0][1]))
 
-                result = cv2.pointPolygonTest(contour, point, False)
+            result = cv2.pointPolygonTest(contour, point, False)
 
-                if result == 1.0:
-                    count += 1
-        return count
+            if result == 1.0:
+                contained_contours.append(idx)
+    return contained_contours
 
-def calculate_heights_old(contours, img_shape, initial_height=INITIAL_HGT):
-    contour_with_heights = {}
-    for i, contour in contours.items():
-        if is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
-            num_contained_contours = count_contained_contours(contour, contours)
-            height = initial_height - DIFF * num_contained_contours # fix
-            contour_with_heights[i] = (height, contour)
-            print(f"Contour {i} has height {height}")
+def try_find_son_contour(contour, contour_index, contour_dict, father_contours):
+    contained_contours = return_contained_contours(contour, contour_dict)
+    if len(contained_contours) == 1:
+        return contained_contours[0]
+    elif len(contained_contours) > 1:
+        for c in contained_contours:
+            if c not in father_contours:
+                return c
+    return None
     
-    return contour_with_heights
+def generate_fathers_dict(contour_dict):
+    # We'll use a dictionary to store only the direct father of each contour
+    father_dict = {}  # dict of the shape {contour_number: father_contour_number} 
+    while len(father_dict) + 1 != len(contour_dict):
+        for i, contour in contour_dict.items():
+            son_contour = try_find_son_contour(contour, i, contour_dict, father_dict)
+            if son_contour is not None:
+                father_dict[son_contour] = i
+                print(f"Contour {i} has father {son_contour}")
+        print(f"Looping in generate_fathers_dict.")
+    return father_dict
 
-def calculate_heights(contours, img_shape, initial_height=INITIAL_HGT):
-    contour_with_heights = {}
-    assigned_contours = {}
-    # Assign tops with initial height
-    for i, contour in contours.items():
-        if is_contour_closed2(contour, X_MAX=img_shape[1], Y_MAX=img_shape[0]):
-            num_contained_contours = count_contained_contours(contour, contours)
-            if num_contained_contours == 0:
-                height = initial_height
-                assigned_contours.add(i)
-            else:
-                height = -1
-            contour_with_heights[i] = (height, contour)
+def father_to_heights(father_dict, initial_height=INITIAL_HGT):
+    # We'll use a dictionary to store the height of each contour
+    height_dict = {}  # dict of the shape {contour_number: height}
+    # Assign heights to the top contours. We know a contour is a top contour if it is no one's father
+    for i, father in father_dict.items():
+        if i not in father_dict.values():
+            height_dict[i] = initial_height
+    while len(height_dict) != len(father_dict) + 1:  # +1 because the top contour is not in the father_dict
+        for i, father in father_dict.items():
+            if i in height_dict:
+                height_dict[father] = height_dict[i] - DIFF
+        print(f"Looping in father_to_heights. Height dict: {height_dict}")
+    return height_dict
 
-    # Assign heights to the rest of the contours
-    while len(assigned_contours) != 
-        
-    
-    return contour_with_heights
+def zip_contours_with_heights(contours, heights):
+    return {i: (heights[i], contour) for i, contour in contours.items()}
 
 def plot_3d_model_from_dict(contours_with_heights, diff=DIFF):
     # Initialize the plotter
@@ -281,11 +212,19 @@ def algorithmic(contours, img_shape):
     contour_dict = {}
     for i, contour in enumerate(contours):
         contour_dict[i] = contour
+    print(f"Contour dict: {contour_dict}")
 
     plot_all_contours(contour_dict)
 
-    # get a dictionary of contours with heights for closed contours
-    contour_with_heights = calculate_heights(contour_dict, img_shape) # dict format is {contour_number: (height, contour)}
+    # get a dictionary of contour_index: father_index
+    father_dict = generate_fathers_dict(contour_dict)
+    print(f"Father dict: {father_dict}")
+
+    # translate father_dict to a dictionary of contour_index: height
+    contour_heights = father_to_heights(father_dict)  # dict of the shape {contour_number: height}
+
+    # zip the contours with their heights
+    contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
 
     # draw contours with heights in 3D, using pyvista. Complete mesh between the contours
     # and plot the 3D model
