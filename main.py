@@ -11,11 +11,12 @@ import os
 import sys
 import random
 from algorithmic import algorithmic
+import algorithmic_advancements
 import math
 import statistics
 import argparse
 
-DEBUG = False
+DEBUG = True
 IMG1 = 'images\map_small.png'
 IMG1 = 'images\map_big.jpg'
 IMG = 'images\map_hand2.jpg'
@@ -205,7 +206,9 @@ def main(img_path):
     white_img = cv2.imread('images\white_img.jpg')
     if(DEBUG):
         for (i,contour) in enumerate(contours):
-            if(i==5 or i==4):
+            if(i==15 or i==19):
+                print(contour)
+                print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
                 cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
         cv2.imshow('Contours', white_img)
         cv2.waitKey(0)
