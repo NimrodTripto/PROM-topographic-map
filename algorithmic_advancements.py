@@ -8,6 +8,10 @@ import random
 import math
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
+from scipy.integrate import simps
+
+PART_LENGTH = 50  # in pixels
+MERGE_THRESHOLD = 0.01  # in radians
 
 # # types: 1 - only one face touched, 2 - two adjacent faces touched, 3 - two nonAdjacent faces touched
 # def contour_type(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
@@ -60,6 +64,173 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
     #     r
 
 
-def contour_to_r_theta(contour,middle_point):
-    contour.squeeze()
-    return [[np.abs([point[0]-middle_point[0],point[1]-middle_point[1]]),np.angle([point[0]-middle_point[0],point[1]-middle_point[1]])] for point in contour]
+def contour_to_r_theta(contour, middle_point):
+    r_theta = []
+    rs,thetas = [],[]
+    for point in contour:
+        dx = point[0][0] - middle_point[0]
+        dy = point[0][1] - middle_point[1]
+        r = np.sqrt(dx**2 + dy**2)
+        theta = np.arctan2(dy, dx)
+        r_theta.append([r, theta])
+        rs.append(r)
+        thetas.append(theta)
+    # plt.figure()
+    # print("rs and thetas",rs,thetas)
+    # plt.plot(thetas,rs, label='Contour Segment')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Radius (r)')
+    # # plt.title(f'Contour Segment of {contour_index} in r(θ) Space')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+    return r_theta
+
+def curvature(r, theta):
+    # print(r[0],theta[0])
+    # # Check if there are two points with same r or theta, if so then remove one of them
+    # if len(r) != len(set(r)):
+    #     for i in range(len(r)):
+    #         for j in range(i+1, len(r)):
+    #             if r[i] == r[j]:
+    #                 r[j] += 0.0001
+    # if len(theta) != len(set(theta)):
+    #     for i in range(len(theta)):
+    #         for j in range(i+1, len(theta)):
+    #             if theta[i] == theta[j]:
+    #                 theta[j] += 0.0001
+    # print(r.shape(),theta.shape())
+    r_prime = np.gradient(r, theta)
+    r_double_prime = np.gradient(r_prime, theta)
+    
+    numerator = r**2 + 2 * r_prime**2 - r * r_double_prime
+    denominator = (r_prime**2 + r**2)**(3/2)
+    
+    return numerator / denominator
+
+def total_curvature(points):
+    # Convert the list of points to numpy arrays
+    points = np.array(points)
+    x = points[:, 0]
+    y = points[:, 1]
+
+    # Calculate first derivatives
+    dx = np.gradient(x)
+    dy = np.gradient(y)
+
+    # Calculate second derivatives
+    ddx = np.gradient(dx)
+    ddy = np.gradient(dy)
+
+    # Calculate the curvature using the formula
+    curvature = np.abs(ddy * dx - ddx * dy) / (dx**2 + dy**2)**(3/2)
+
+    # Integrate the curvature to find the total curvature
+    total_curv = simps(curvature, x)
+    
+    return total_curv
+
+def divide_contour(contour, part_length=PART_LENGTH):
+    # print(contour)
+    parts = []
+    for i in range(0, len(contour), part_length):
+        parts.append(contour[i:i+part_length])
+    return parts  # returns a list of lists of points
+
+def one_to_one_function(contour, merge_threshold=MERGE_THRESHOLD):
+    # Convert list of points to numpy array for easier manipulation
+    contour = np.array(contour)
+    r = contour[:, 0]
+    theta = contour[:, 1]
+
+    def bin_and_average(values, threshold):
+        sorted_values = np.sort(values)
+        binned_values = []
+        i = 0
+        while i < len(sorted_values):
+            bin_values = [sorted_values[i]]
+            while i + 1 < len(sorted_values) and sorted_values[i + 1] - sorted_values[i] <= threshold:
+                bin_values.append(sorted_values[i + 1])
+                i += 1
+            binned_values.append(np.mean(bin_values))
+            i += 1
+        return binned_values
+
+    # Bin and average r values for each theta
+    unique_theta = np.unique(theta)
+    binned_r_theta = []
+    for theta_value in unique_theta:
+        indices = np.where(theta == theta_value)[0]
+        r_values = r[indices]
+        binned_r_values = bin_and_average(r_values, merge_threshold)
+        for r_value in binned_r_values:
+            binned_r_theta.append([r_value, theta_value])
+
+    # Bin and average theta values for each r
+    unique_r = np.unique(r)
+    final_binned_r_theta = []
+    for r_value in unique_r:
+        indices = np.where(r == r_value)[0]
+        theta_values = theta[indices]
+        binned_theta_values = bin_and_average(theta_values, merge_threshold)
+        for theta_value in binned_theta_values:
+            final_binned_r_theta.append([r_value, theta_value])
+
+    # Sort the result by theta values
+    final_binned_r_theta.sort(key=lambda x: x[1])
+
+    return final_binned_r_theta
+
+
+def plot_r_theta(r_theta, contour_index=0, title='Contour Segment in r(θ) Space'):
+    plt.figure()
+    r = [r for r, _ in r_theta]
+    theta = [theta for _, theta in r_theta]
+    # Check if all theta numbers, if no then print theta
+    for t in theta:
+        if not isinstance(t, (int, float)):
+            print(f"Theta is not a number. Theta is {t}")
+    plt.plot(theta, r, label='Contour Segment')
+    plt.xlabel('Theta (radians)')
+    plt.ylabel('Radius (r)')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+def calculate_curvature_from_contour(contour, middle_point, contour_index=0):
+    r_theta = contour_to_r_theta(contour, middle_point)
+    # Plotting the contour segment in r(theta) space
+    plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space')
+    r_theta = one_to_one_function(r_theta)
+    # Print all r values where theta is -0.8+-0.03 and print them
+    for r, theta in r_theta:
+        if theta < -0.8 and theta > -0.86:
+            print(f"r: {r}, theta: {theta}")
+    # Plotting the contour segment in r(theta) space
+    plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space, one to one')
+    # divided = divide_contour(r_theta)
+    # total_curvature = 0
+    # for part in divided:
+    #     if len(part) < 2:  # Skip empty or too small parts
+    #         print("Skipping part")
+    #         continue
+    #     r, theta = zip(*part)
+    #     r = np.array(r)
+    #     theta = np.array(theta)
+    #     total_curvature += np.sum(curvature(r, theta))
+    total_curv = total_curvature(r_theta)
+    # # Plotting the contour segment in r(theta) space
+    # plt.figure()
+    # # extrat r_list from r_theta
+    # r = [r for r, _ in r_theta]
+    # theta = [theta for _, theta in r_theta]
+    # plt.plot(theta, r, label='Contour Segment')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Radius (r)')
+    # plt.title(f'Contour Segment of {contour_index} in r(θ) Space')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+    return total_curv

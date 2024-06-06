@@ -2,20 +2,17 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import pyvista as pv
-import os
-import sys
-import random
-import math
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from scipy.spatial import Delaunay
 import matplotlib.path as mplPath
+from algorithmic_advancements import calculate_curvature_from_contour
 
 
 INITIAL_HGT = 3000
 DIFF = 10
 THRESH = 2.0
-THRESH_CLOSED = 1.0
+THRESH_CLOSED = 0.2
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
     """
@@ -190,30 +187,38 @@ def algorithmic(contours, img_shape):
     #         f.write(f"{point[0][0]} {point[0][1]}\n")
     
     # pass all the closed contours to a given dictionary, while numbering the contours by some order
-    contour_dict = {}
+    closed_contour_dict = {}
+    open_contour_dict = {}
+    all_contour_dict = {}
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
         if len(contour) > 1:
-            contour_dict[i] = contour  
-
-    # get a dictionary of contour_index: father_index
-    father_dict = generate_fathers_dict(contour_dict)
-
-    plot_all_contours(contour_dict)
-
-    # translate father_dict to a dictionary of contour_index: height
-    contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
-
-    # zip the contours with their heights
-    contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
+            if is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
+                closed_contour_dict[i] = contour
+            else:
+                open_contour_dict[i] = contour
+            all_contour_dict[i] = contour
     
-    # create mesh
-    mesh = create_pyvista_mesh(contour_with_heights)
+    plot_all_contours(all_contour_dict)
 
-    # plot the mesh
-    plot_gradient_mesh(mesh)
+    for i, contour in open_contour_dict.items():
+        print(f"starting contour number {i}")
+        curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
+        print(f"Curvature of contour {i} is {curvature}")
 
-    # draw contours with heights in 3D, using pyvista. Complete mesh between the contours
-    # and plot the 3D model
-    # plot_3d_model_from_dict(contour_with_heights)
-    print("Done")
+    # # translate father_dict to a dictionary of contour_index: height
+    # contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
+
+    # # zip the contours with their heights
+    # contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
+    
+    # # create mesh
+    # mesh = create_pyvista_mesh(contour_with_heights)
+
+    # # plot the mesh
+    # plot_gradient_mesh(mesh)
+
+    # # draw contours with heights in 3D, using pyvista. Complete mesh between the contours
+    # # and plot the 3D model
+    # # plot_3d_model_from_dict(contour_with_heights)
+    # print("Done")
