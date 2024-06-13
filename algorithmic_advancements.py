@@ -9,6 +9,7 @@ import math
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from scipy.integrate import simps
+from scipy.interpolate import UnivariateSpline
 
 PART_LENGTH = 50  # in pixels
 BIN_SIZE = 0.01  # in radians
@@ -108,27 +109,80 @@ def curvature(r, theta):
     
     return numerator / denominator
 
-def total_curvature(points):
-    # Convert the list of points to numpy arrays
-    points = np.array(points)
-    x = points[:, 0]
-    y = points[:, 1]
+def calculate_curvature(data, smoothing_factor=0.5):
+    data = np.array(data)
+    theta = data[:, 1]
+    r = data[:, 0]
 
-    # Calculate first derivatives
-    dx = np.gradient(x)
-    dy = np.gradient(y)
+    # Sort the data by theta
+    sorted_indices = np.argsort(theta)
+    theta = theta[sorted_indices]
+    r = r[sorted_indices]
 
-    # Calculate second derivatives
-    ddx = np.gradient(dx)
-    ddy = np.gradient(dy)
+    # Fit a spline to the data
+    spline = UnivariateSpline(theta, r, s=smoothing_factor)
 
-    # Calculate the curvature using the formula
-    curvature = np.abs(ddy * dx - ddx * dy) / (dx**2 + dy**2)**(3/2)
+    # Create a dense range of theta values for smooth curve
+    theta_dense = np.linspace(np.min(theta), np.max(theta), 1000)
 
-    # Integrate the curvature to find the total curvature
-    total_curv = simps(curvature, x)
+    # Calculate the second derivative of the spline
+    spline_second_derivative = spline.derivative(n=2)
+
+    # Evaluate the second derivative at dense theta values
+    second_derivative_values = spline_second_derivative(theta_dense)
+
+    # Calculate the total curvature
+    total_curvature = np.sum(second_derivative_values)
+
+    # Determine the nature of the function
+    if total_curvature > 0:
+        nature = "smiling"
+    else:
+        nature = "sad"
+
+    # Plot the original data and the spline
+    plt.figure(figsize=(8, 6))
+    plt.plot(theta, r, 'o', label='Data points')
+    plt.plot(theta_dense, spline(theta_dense), '-', label='Fitted spline')
+    plt.xlabel('Theta (radians)')
+    plt.ylabel('Radius (r)')
+    plt.legend()
+    plt.title(f"The function is mostly '{nature}'")
+    plt.show()
+
+    # Plot the second derivative to visualize curvature
+    plt.figure(figsize=(8, 6))
+    plt.plot(theta_dense, second_derivative_values, label='Second Derivative')
+    plt.axhline(0, color='black', linewidth=0.5, linestyle='--')
+    plt.xlabel('Theta (radians)')
+    plt.ylabel('Second Derivative')
+    plt.legend()
+    plt.title("Second Derivative of the Fitted Spline")
+    plt.show()
+
+    return total_curvature, nature
+
+# def total_curvature(points):
+#     # Convert the list of points to numpy arrays
+#     points = np.array(points)
+#     x = points[:, 0]
+#     y = points[:, 1]
+
+#     # Calculate first derivatives
+#     dx = np.gradient(x)
+#     dy = np.gradient(y)
+
+#     # Calculate second derivatives
+#     ddx = np.gradient(dx)
+#     ddy = np.gradient(dy)
+
+#     # Calculate the curvature using the formula
+#     curvature = np.abs(ddy * dx - ddx * dy) / (dx**2 + dy**2)**(3/2)
+
+#     # Integrate the curvature to find the total curvature
+#     total_curv = simps(curvature, x)
     
-    return total_curv
+#     return total_curv
 
 def divide_contour(contour, part_length=PART_LENGTH):
     # print(contour)
@@ -246,7 +300,8 @@ def calculate_curvature_from_contour(contour, middle_point, contour_index=0):
     #     r = np.array(r)
     #     theta = np.array(theta)
     #     total_curvature += np.sum(curvature(r, theta))
-    total_curv = total_curvature(r_theta)
+    # This function return (number, "smiling"/"sad")
+    total_curv = calculate_curvature(r_theta)
     # # Plotting the contour segment in r(theta) space
     # plt.figure()
     # # extrat r_list from r_theta
@@ -259,4 +314,4 @@ def calculate_curvature_from_contour(contour, middle_point, contour_index=0):
     # plt.legend()
     # plt.grid(True)
     # plt.show()
-    return total_curv
+    return total_curv[0]
