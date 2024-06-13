@@ -13,6 +13,7 @@ INITIAL_HGT = 3000
 DIFF = 10
 THRESH = 2.0
 THRESH_CLOSED = 0.2
+THRESH_EDGE = 2
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
     """
@@ -93,11 +94,14 @@ def return_contained_contours(contour, all_contours):
                 contained_contours.append(idx)
     return contained_contours
 
-def find_father_contour(contour, contour_index, contour_dict, father_contours):
+def find_father_contour(contour, contour_index, contour_dict, father_contours, img_shape):
     # We'll go over all contours, if we find a contour that i'm his son and not his grandson then he is my father
     for i, other_contour in contour_dict.items():
         if i != contour_index:
-            if cv2.pointPolygonTest(other_contour, (int(contour[0][0][0]), int(contour[0][0][1])), False) == 1.0:
+            index = 0
+            while contour[index][0][0] != img_shape[0] - THRESH_EDGE and contour[index][0][1] != img_shape[1] - THRESH_EDGE:
+                index += 10
+            if cv2.pointPolygonTest(other_contour, (int(contour[index][0][0]), int(contour[index][0][1])), False) == 1.0:
                 if not am_i_grandson(contour_index, i, contour_dict):
                     return i
     return None
@@ -110,11 +114,11 @@ def am_i_grandson(contour_index_1, contour_index_2, contour_dict):  # this funct
             return True
     return False
 
-def generate_fathers_dict(contour_dict):
+def generate_fathers_dict(contour_dict, img_shape):
     # We'll use a dictionary to store only the direct father of each contour
     father_dict = {}  # dict of the shape {contour_number: father_contour_number}
     for i, contour in contour_dict.items():
-        father_contour = find_father_contour(contour, i, contour_dict, father_dict)
+        father_contour = find_father_contour(contour, i, contour_dict, father_dict, img_shape)
         if father_contour is not None:
             father_dict[i] = father_contour
     return father_dict
@@ -198,6 +202,11 @@ def algorithmic(contours, img_shape):
             else:
                 open_contour_dict[i] = contour
             all_contour_dict[i] = contour
+
+    # for i, contour in enumerate(open_contour_dict):
+    #     curvature = calculate_curvature_from_contour(contour, (0,0), i)
+        # open_contour_dict[i] = close_open_contour(contour)
+        # all_contour_dict[i] = close_open_contour(contour, curvature)
     
     plot_all_contours(all_contour_dict)
 
@@ -206,11 +215,13 @@ def algorithmic(contours, img_shape):
         curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
         print(f"Curvature of contour {i} is {curvature}")
 
+    # father_dict = generate_fathers_dict(all_contour_dict, img_shape)
+
     # # translate father_dict to a dictionary of contour_index: height
-    # contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
+    # contour_heights = father_to_heights(father_dict, all_contour_dict)  # dict of the shape {contour_number: height}
 
     # # zip the contours with their heights
-    # contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
+    # contour_with_heights = zip_contours_with_heights(all_contour_dict, contour_heights)
     
     # # create mesh
     # mesh = create_pyvista_mesh(contour_with_heights)

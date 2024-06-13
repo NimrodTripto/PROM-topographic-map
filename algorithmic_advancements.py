@@ -13,6 +13,7 @@ from scipy.interpolate import UnivariateSpline
 
 PART_LENGTH = 50  # in pixels
 BIN_SIZE = 0.01  # in radians
+STRAIGHT_SIZE = 0.1
 
 # # types: 1 - only one face touched, 2 - two adjacent faces touched, 3 - two nonAdjacent faces touched
 # def contour_type(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
@@ -235,6 +236,43 @@ def divide_contour(contour, part_length=PART_LENGTH):
 
 #     return final_binned_r_theta
 
+# def close_open_contour(contour, img_shape, curvature,thresh = 2):
+#     if(curvature>0):
+#         all_faces_with_value = []
+#         all_faces = set()
+#         contour_points = contour.squeeze()
+#         first_point, second_point = [0,0], [img_shape[0],img_shape[1]]
+#         x1, y1 = first_point[0], first_point[1]
+#         x2, y2 = second_point[0], second_point[1]
+
+        
+#         # Check the first condition
+#         for point in contour_points:
+#             x, y = point[0], point[1]
+#             if np.abs(y - y1) <= thresh and 1 not in all_faces:
+#                 all_faces_with_value.append((1,x))
+#                 all_faces.add(1)
+#             if np.abs(y - y2) <= thresh and 3 not in all_faces:
+#                 all_faces_with_value.append((3,x))
+#                 all_faces.add(3)
+#             if np.abs(x - x1) <= thresh and 4 not in all_faces:
+#                 all_faces_with_value.append((4,y))
+#                 all_faces.add(4)
+#             if np.abs(x - x2) <= thresh and 2 not in all_faces:
+#                 all_faces_with_value.append((2,y))
+#                 all_faces.add(2)
+#         if(len(all_faces)==2):
+#             if(1 in all_faces and 2 in all_faces):
+#                 x_point,y_point = 0,0
+#                 for side,val in all_faces_with_value:
+#                     if(side==1 and x_point==0):
+#                         x_point = val
+#                     if(side==2 and y_point==0):
+#                         y_point = val
+#                 line1,line2 = generate_straight_line([x_point,0],[x2,0]),generate_straight_line([x2,y_point],[x2,0])
+
+#     return contour
+
 
 def one_to_one_function(contour, bin_size=BIN_SIZE):
     contour = np.array(contour)
@@ -315,3 +353,22 @@ def calculate_curvature_from_contour(contour, middle_point, contour_index=0):
     # plt.grid(True)
     # plt.show()
     return total_curv[0]
+
+def generate_straight_line(start_point, end_point, bin_size):
+    start_point = np.array(start_point)
+    end_point = np.array(end_point)
+    
+    # Calculate the total distance between the start and end points
+    total_distance = np.linalg.norm(end_point - start_point)
+    
+    # Calculate the number of points based on the bin size
+    num_points = int(total_distance // bin_size) + 1
+    
+    # Generate points along the straight line
+    points = [start_point + i * bin_size * (end_point - start_point) / total_distance for i in range(num_points)]
+    
+    # Ensure the end point is included
+    if np.linalg.norm(points[-1] - end_point) > 1e-10:
+        points.append(end_point)
+    
+    return np.array(points)
