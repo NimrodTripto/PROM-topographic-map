@@ -204,6 +204,8 @@ def algorithmic(contours, img_shape):
     # translate father_dict to a dictionary of contour_index: height
     contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
 
+    # ALGORITHM
+
     # zip the contours with their heights
     contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
     
