@@ -11,7 +11,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from scipy.integrate import simps
 
 PART_LENGTH = 50  # in pixels
-MERGE_THRESHOLD = 0.01  # in radians
+BIN_SIZE = 0.01  # in radians
 
 # # types: 1 - only one face touched, 2 - two adjacent faces touched, 3 - two nonAdjacent faces touched
 # def contour_type(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
@@ -137,49 +137,75 @@ def divide_contour(contour, part_length=PART_LENGTH):
         parts.append(contour[i:i+part_length])
     return parts  # returns a list of lists of points
 
-def one_to_one_function(contour, merge_threshold=MERGE_THRESHOLD):
-    # Convert list of points to numpy array for easier manipulation
+# def one_to_one_function(contour, merge_threshold=MERGE_THRESHOLD):
+#     # Convert list of points to numpy array for easier manipulation
+#     contour = np.array(contour)
+#     r = contour[:, 0]
+#     theta = contour[:, 1]
+
+#     def bin_and_average(values, threshold):
+#         sorted_values = np.sort(values)
+#         binned_values = []
+#         i = 0
+#         while i < len(sorted_values):
+#             bin_values = [sorted_values[i]]
+#             while i + 1 < len(sorted_values) and sorted_values[i + 1] - sorted_values[i] <= threshold:
+#                 bin_values.append(sorted_values[i + 1])
+#                 i += 1
+#             binned_values.append(np.mean(bin_values))
+#             i += 1
+#         return binned_values
+
+#     # Bin and average r values for each theta
+#     unique_theta = np.unique(theta)
+#     binned_r_theta = []
+#     for theta_value in unique_theta:
+#         indices = np.where(theta == theta_value)[0]
+#         r_values = r[indices]
+#         binned_r_values = bin_and_average(r_values, merge_threshold)
+#         for r_value in binned_r_values:
+#             binned_r_theta.append([r_value, theta_value])
+
+#     # Bin and average theta values for each r
+#     unique_r = np.unique(r)
+#     final_binned_r_theta = []
+#     for r_value in unique_r:
+#         indices = np.where(r == r_value)[0]
+#         theta_values = theta[indices]
+#         binned_theta_values = bin_and_average(theta_values, merge_threshold)
+#         for theta_value in binned_theta_values:
+#             final_binned_r_theta.append([r_value, theta_value])
+
+#     # Sort the result by theta values
+#     final_binned_r_theta.sort(key=lambda x: x[1])
+
+#     return final_binned_r_theta
+
+
+def one_to_one_function(contour, bin_size=BIN_SIZE):
     contour = np.array(contour)
     r = contour[:, 0]
     theta = contour[:, 1]
 
-    def bin_and_average(values, threshold):
-        sorted_values = np.sort(values)
-        binned_values = []
-        i = 0
-        while i < len(sorted_values):
-            bin_values = [sorted_values[i]]
-            while i + 1 < len(sorted_values) and sorted_values[i + 1] - sorted_values[i] <= threshold:
-                bin_values.append(sorted_values[i + 1])
-                i += 1
-            binned_values.append(np.mean(bin_values))
-            i += 1
-        return binned_values
+    # Calculate min and max theta
+    min_theta = np.min(theta)
+    max_theta = np.max(theta)
+    # print(f"Min theta is: {min_theta}, Max theta is: {max_theta}")
 
-    # Bin and average r values for each theta
-    unique_theta = np.unique(theta)
+    # Create bins
+    bins = np.arange(min_theta, max_theta + bin_size, bin_size)
+    # print(f"Bins are: {bins}")
+
     binned_r_theta = []
-    for theta_value in unique_theta:
-        indices = np.where(theta == theta_value)[0]
-        r_values = r[indices]
-        binned_r_values = bin_and_average(r_values, merge_threshold)
-        for r_value in binned_r_values:
-            binned_r_theta.append([r_value, theta_value])
-
-    # Bin and average theta values for each r
-    unique_r = np.unique(r)
-    final_binned_r_theta = []
-    for r_value in unique_r:
-        indices = np.where(r == r_value)[0]
-        theta_values = theta[indices]
-        binned_theta_values = bin_and_average(theta_values, merge_threshold)
-        for theta_value in binned_theta_values:
-            final_binned_r_theta.append([r_value, theta_value])
-
-    # Sort the result by theta values
-    final_binned_r_theta.sort(key=lambda x: x[1])
-
-    return final_binned_r_theta
+    for i in range(len(bins) - 1):
+        indices = np.where((theta >= bins[i]) & (theta < bins[i + 1]))[0]
+        if len(indices) > 0:
+            avg_r = np.mean(r[indices])
+            avg_theta = np.mean(theta[indices])
+            binned_r_theta.append((avg_r, avg_theta))
+    
+    # print(f"Binned r-theta pairs are: {binned_r_theta}")
+    return binned_r_theta
 
 
 def plot_r_theta(r_theta, contour_index=0, title='Contour Segment in r(θ) Space'):
@@ -205,9 +231,9 @@ def calculate_curvature_from_contour(contour, middle_point, contour_index=0):
     plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space')
     r_theta = one_to_one_function(r_theta)
     # Print all r values where theta is -0.8+-0.03 and print them
-    for r, theta in r_theta:
-        if theta < -0.8 and theta > -0.86:
-            print(f"r: {r}, theta: {theta}")
+    # for r, theta in r_theta:
+    #     if theta < -0.8 and theta > -0.86:
+    #         print(f"r: {r}, theta: {theta}")
     # Plotting the contour segment in r(theta) space
     plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space, one to one')
     # divided = divide_contour(r_theta)
