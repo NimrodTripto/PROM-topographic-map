@@ -11,11 +11,12 @@ import os
 import sys
 import random
 from algorithmic import algorithmic
+import algorithmic_advancements
 import math
 import statistics
 import argparse
 
-DEBUG = False
+DEBUG = True
 IMG1 = 'images\map_small.png'
 IMG1 = 'images\map_big.jpg'
 IMG = 'images\map_hand2.jpg'
@@ -194,7 +195,7 @@ def main(img_path):
     curr_img = binary
     curr_img = dilate_img(curr_img,(2,2),1)
     curr_img = erode_img(curr_img,(2,2),1)
-    cv2.imshow('Contours', curr_img)
+    # cv2.imshow('Contours', curr_img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     contours = find_contours(curr_img)
@@ -205,9 +206,11 @@ def main(img_path):
     white_img = cv2.imread('images\white_img.jpg')
     if(DEBUG):
         for (i,contour) in enumerate(contours):
-            if(i==5 or i==4):
+            if(i==15 or i==19):
+                # print(contour)
+                # print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
                 cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-        cv2.imshow('Contours', white_img)
+        # cv2.imshow('Contours', white_img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     else:
@@ -217,6 +220,7 @@ def main(img_path):
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
 
+    # algorithmic([contours[15]], img.shape[:2])
     algorithmic(contours_after, img.shape[:2])
 
 

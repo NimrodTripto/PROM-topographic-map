@@ -1,26 +1,46 @@
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Load the image
-image_path = 'contour_image.png'  # Replace with the path to your image
-image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+# Example contour data: Replace this with actual data
+contour = np.array([[1, 1], [2, 2], [3, 1], [4, 0], [3, -1], [2, -2], [1, -1]])
 
-# Apply a binary threshold to get a binary image
-_, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+# Step 1: Convert to Polar Coordinates
+def to_polar(x, y):
+    r = np.sqrt(x**2 + y**2)
+    theta = np.arctan2(y, x)
+    return r, theta
 
-# Find contours
-contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+r, theta = to_polar(contour[:, 0], contour[:, 1])
 
-# Draw contours on the original image (for visualization)
-image_contours = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-cv2.drawContours(image_contours, contours, -1, (0, 255, 0), 2)
+# Step 2: Calculate Curvature in Polar Coordinates
+def calculate_curvature_polar(r, theta):
+    dr_dt = np.gradient(r)
+    dtheta_dt = np.gradient(theta)
+    ds_dt = np.sqrt(dr_dt**2 + (r * dtheta_dt)**2)
+    dr_dtheta = np.gradient(r, dtheta_dt)
+    curvature = (r**2 + 2*(dr_dt)**2 - r*dr_dtheta) / (r**2 + dr_dt**2)**(3/2)
+    return curvature
 
-# Display the image with contours
-plt.imshow(image_contours)
-plt.title('Contours')
+curvature = calculate_curvature_polar(r, theta)
+
+# Step 3: Analyze Curvature Direction
+def analyze_closure_direction(curvature):
+    positive_curvature = curvature[curvature > 0]
+    negative_curvature = curvature[curvature < 0]
+    if np.sum(positive_curvature) > np.sum(negative_curvature):
+        return 'Closes to the left'
+    else:
+        return 'Closes to the right'
+
+direction = analyze_closure_direction(curvature)
+
+# Plotting for visualization
+plt.figure(figsize=(10, 8))
+plt.plot(contour[:, 0], contour[:, 1], label='Original Contour')
+plt.title(f'Contour Analysis - {direction}')
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
+plt.legend()
 plt.show()
 
-# Print contours for reference
-for i, contour in enumerate(contours):
-    print(f'Contour {i}: {contour}')
+print(direction)
