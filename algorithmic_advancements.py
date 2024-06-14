@@ -65,6 +65,50 @@ STRAIGHT_SIZE = 0.1
     # if contour_type(contour) != 1:
     #     r
 
+def close_open_contour(contour, img_shape, curvature,thresh = 2):
+    if(curvature>0):
+        all_faces_with_value = []
+        all_faces = set()
+        contour_points = contour.squeeze()
+        first_point, second_point = [0,0], [img_shape[1],img_shape[0]]
+        x1, y1 = first_point[0], first_point[1]
+        x2, y2 = second_point[0], second_point[1]
+        # print(f"x2: {x2}")
+        # print(f"y2: {y2}")
+        
+        # Check the first condition
+        for point in contour_points:
+            x, y = point[0], point[1]
+            if np.abs(y - y1) <= thresh and 1 not in all_faces:
+                all_faces_with_value.append((1,x))
+                all_faces.add(1)
+            if np.abs(y - y2) <= thresh and 3 not in all_faces:
+                all_faces_with_value.append((3,x))
+                all_faces.add(3)
+            if np.abs(x - x1) <= thresh and 4 not in all_faces:
+                all_faces_with_value.append((4,y))
+                all_faces.add(4)
+            if np.abs(x - x2) <= thresh and 2 not in all_faces:
+                all_faces_with_value.append((2,y))
+                all_faces.add(2)
+        # print(f"all faces: {all_faces_with_value}")
+        if(len(all_faces)==2):
+            # print("got here")
+            if(1 in all_faces and 2 in all_faces):
+                x_point,y_point = 0,0
+                for side,val in all_faces_with_value:
+                    if(side==1 and x_point==0):
+                        x_point = val
+                    if(side==2 and y_point==0):
+                        y_point = val
+                line1,line2 = generate_straight_line([x_point,0],[x2,0],0.2),generate_straight_line([x2,y_point],[x2,0],0.2)
+                # contour.extend(line1).extend(line2)
+                # print(contour.shape)
+                print(np.concatenate((contour, line1,line2), axis=0).shape)
+                return np.concatenate((contour, line1,line2), axis=0)
+
+    return contour
+
 
 def contour_to_r_theta(contour, middle_point):
     r_theta = []
@@ -142,24 +186,24 @@ def calculate_curvature(data, smoothing_factor=0.5):
         nature = "sad"
 
     # Plot the original data and the spline
-    plt.figure(figsize=(8, 6))
-    plt.plot(theta, r, 'o', label='Data points')
-    plt.plot(theta_dense, spline(theta_dense), '-', label='Fitted spline')
-    plt.xlabel('Theta (radians)')
-    plt.ylabel('Radius (r)')
-    plt.legend()
-    plt.title(f"The function is mostly '{nature}'")
-    plt.show()
+    # plt.figure(figsize=(8, 6))
+    # plt.plot(theta, r, 'o', label='Data points')
+    # plt.plot(theta_dense, spline(theta_dense), '-', label='Fitted spline')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Radius (r)')
+    # plt.legend()
+    # plt.title(f"The function is mostly '{nature}'")
+    # plt.show()
 
-    # Plot the second derivative to visualize curvature
-    plt.figure(figsize=(8, 6))
-    plt.plot(theta_dense, second_derivative_values, label='Second Derivative')
-    plt.axhline(0, color='black', linewidth=0.5, linestyle='--')
-    plt.xlabel('Theta (radians)')
-    plt.ylabel('Second Derivative')
-    plt.legend()
-    plt.title("Second Derivative of the Fitted Spline")
-    plt.show()
+    # # Plot the second derivative to visualize curvature
+    # plt.figure(figsize=(8, 6))
+    # plt.plot(theta_dense, second_derivative_values, label='Second Derivative')
+    # plt.axhline(0, color='black', linewidth=0.5, linestyle='--')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Second Derivative')
+    # plt.legend()
+    # plt.title("Second Derivative of the Fitted Spline")
+    # plt.show()
 
     return total_curvature, nature
 
@@ -301,20 +345,20 @@ def one_to_one_function(contour, bin_size=BIN_SIZE):
 
 
 def plot_r_theta(r_theta, contour_index=0, title='Contour Segment in r(θ) Space'):
-    plt.figure()
+    # plt.figure()
     r = [r for r, _ in r_theta]
     theta = [theta for _, theta in r_theta]
     # Check if all theta numbers, if no then print theta
     for t in theta:
         if not isinstance(t, (int, float)):
             print(f"Theta is not a number. Theta is {t}")
-    plt.plot(theta, r, label='Contour Segment')
-    plt.xlabel('Theta (radians)')
-    plt.ylabel('Radius (r)')
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # plt.plot(theta, r, label='Contour Segment')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Radius (r)')
+    # plt.title(title)
+    # plt.legend()
+    # plt.grid(True)
+    #plt.show()
 
 
 def calculate_curvature_from_contour(contour, middle_point, contour_index=0):
@@ -371,4 +415,4 @@ def generate_straight_line(start_point, end_point, bin_size):
     if np.linalg.norm(points[-1] - end_point) > 1e-10:
         points.append(end_point)
     
-    return np.array(points)
+    return np.array([[p] for p in points])

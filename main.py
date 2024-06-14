@@ -16,7 +16,7 @@ import math
 import statistics
 import argparse
 
-DEBUG = True
+DEBUG = False
 IMG1 = 'images\map_small.png'
 IMG1 = 'images\map_big.jpg'
 IMG = 'images\map_hand2.jpg'
@@ -196,30 +196,31 @@ def main(img_path):
     curr_img = dilate_img(curr_img,(2,2),1)
     curr_img = erode_img(curr_img,(2,2),1)
     # cv2.imshow('Contours', curr_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     contours = find_contours(curr_img)
     # plot every contour using cv
     contours_after = remove_duplicate_contours(remove_small_contours(contours,10), 5)
     # contours_after = contours
     #i==4
     white_img = cv2.imread('images\white_img.jpg')
-    if(DEBUG):
-        for (i,contour) in enumerate(contours):
-            if(i==15 or i==19):
-                # print(contour)
-                # print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
-                cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-        # cv2.imshow('Contours', white_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-    else:
-        for (i,contour) in enumerate(contours_after):
-            cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+    # if(DEBUG):
+    #     for (i,contour) in enumerate(contours_after):
+    #         if(i==0 or i==7):
+    #             # print(contour)
+    #             # print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
+    #             cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+    #     cv2.imshow('Contours', white_img)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    # else:
+    #     for (i,contour) in enumerate(contours_after):
+    #         cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
         # cv2.imshow('Contours', white_img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
-
+    contours_after.pop(7)
+    contours_after.pop(0)
     # algorithmic([contours[15]], img.shape[:2])
     algorithmic(contours_after, img.shape[:2])
 
