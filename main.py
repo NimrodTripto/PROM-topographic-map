@@ -193,8 +193,8 @@ def main(img_path):
     img = get_image(img_path)
     binary = image_to_binary_sens(img)
     curr_img = binary
-    curr_img = dilate_img(curr_img,(2,2),1)
-    curr_img = erode_img(curr_img,(2,2),1)
+    curr_img = dilate_img(curr_img,(2,2),2)
+    curr_img = erode_img(curr_img,(2,2),2)
     # cv2.imshow('Contours', curr_img)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
