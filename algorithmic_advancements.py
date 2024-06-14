@@ -100,7 +100,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                     x_point_1 = val
                 elif (math.abs(val-x_point_1)>SAME_LINE_THRESH):
                     x_point_2 = val
-            line = generate_straight_line([math.min(x_point_1,x_point_2),0],[math.max(x_point_1,x_point_2),0],STRAIGHT_SIZE)
+            line = generate_straight_line([min(x_point_1,x_point_2),0],[max(x_point_1,x_point_2),0],STRAIGHT_SIZE)
         elif(3 in all_faces):
             x_point_1,x_point_2 = 0,0
             for side,val in all_faces_with_value:
@@ -108,7 +108,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                     x_point_1 = val
                 elif (math.abs(val-x_point_1)>SAME_LINE_THRESH):
                     x_point_2 = val
-            line = generate_straight_line([math.min(x_point_1,x_point_2),y2],[math.max(x_point_1,x_point_2),y2],STRAIGHT_SIZE)
+            line = generate_straight_line([min(x_point_1,x_point_2),y2],[max(x_point_1,x_point_2),y2],STRAIGHT_SIZE)
         elif(2 in all_faces):
             y_point_1,y_point_2 = 0,0
             for side,val in all_faces_with_value:
@@ -116,7 +116,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                     y_point_1 = val
                 elif (math.abs(val-y_point_1)>SAME_LINE_THRESH):
                     y_point_2 = val
-            line = generate_straight_line([x2,math.min(y_point_1,y_point_2)],[x2,math.max(y_point_1,y_point_2)],STRAIGHT_SIZE)
+            line = generate_straight_line([x2,min(y_point_1,y_point_2)],[x2,max(y_point_1,y_point_2)],STRAIGHT_SIZE)
         else:
             y_point_1,y_point_2 = 0,0
             for side,val in all_faces_with_value:
@@ -124,7 +124,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                     y_point_1 = val
                 elif (math.abs(val-y_point_1)>SAME_LINE_THRESH):
                     y_point_2 = val
-            line = generate_straight_line([0,math.min(y_point_1,y_point_2)],[0,math.max(y_point_1,y_point_2)],STRAIGHT_SIZE)
+            line = generate_straight_line([0,min(y_point_1,y_point_2)],[0,max(y_point_1,y_point_2)],STRAIGHT_SIZE)
         return np.concatenate((contour, line), axis=0)
     if(curvature>=0):
         # print(f"all faces: {all_faces_with_value}")

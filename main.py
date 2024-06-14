@@ -219,8 +219,8 @@ def main(img_path):
         # cv2.imshow('Contours', white_img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
-    contours_after.pop(7)
-    contours_after.pop(0)
+    # contours_after.pop(7)
+    # contours_after.pop(0)
     # algorithmic([contours[15]], img.shape[:2])
     algorithmic(contours_after, img.shape[:2])
 
