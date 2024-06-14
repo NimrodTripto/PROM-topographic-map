@@ -7,13 +7,16 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from scipy.spatial import Delaunay
 import matplotlib.path as mplPath
 from algorithmic_advancements import calculate_curvature_from_contour
+import math
+from scipy.interpolate import griddata, RectBivariateSpline
 
 
-INITIAL_HGT = 3000
-DIFF = 10
+DIFF = 60
 THRESH = 2.0
-THRESH_CLOSED = 0.2
-THRESH_EDGE = 2
+THRESH_CLOSED = 0
+THRESH_EDGE = 1
+JUMP_EDGE = 0.1
+GRID_RES = 100
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
     """
@@ -28,19 +31,19 @@ def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
     bool: True if the contour is closed, False otherwise.
     """
     contour_points = contour.squeeze()
-    first_point, second_point = [0,0], [X_MAX,Y_MAX]
+    first_point, second_point = [0,0], [Y_MAX,X_MAX]
     x1, y1 = first_point[0], first_point[1]
     x2, y2 = second_point[0], second_point[1]
-    
+    counter = 0
     # Check the first condition
     for point in contour_points:
         x, y = point[0], point[1]
         if np.abs(x - x1) <= thresh or np.abs(y - y1) <= thresh:
-            return False
+            counter= counter+1
         if np.abs(x - x2) <= thresh or np.abs(y - y2) <= thresh:
-            return False
-
-    return True
+            counter= counter+1
+    print(counter)
+    return counter>500 or counter==0
 
 def is_valid_contour_shape(array):
     """
@@ -99,8 +102,8 @@ def find_father_contour(contour, contour_index, contour_dict, father_contours, i
     for i, other_contour in contour_dict.items():
         if i != contour_index:
             index = 0
-            while contour[index][0][0] != img_shape[0] - THRESH_EDGE and contour[index][0][1] != img_shape[1] - THRESH_EDGE:
-                index += 10
+            while math.fabs(contour[index][0][0] - img_shape[0]) <= THRESH_EDGE and math.fabs(contour[index][0][1] - img_shape[1]) <= THRESH_EDGE:
+                index += JUMP_EDGE
             if cv2.pointPolygonTest(other_contour, (int(contour[index][0][0]), int(contour[index][0][1])), False) == 1.0:
                 if not am_i_grandson(contour_index, i, contour_dict):
                     return i
@@ -175,11 +178,46 @@ def create_pyvista_mesh(contours_with_heights, diff=DIFF):
 
     return poly
 
+def create_continuous_pyvista_mesh(contours_with_heights, grid_res=GRID_RES):
+    # Collect all points from contours with their corresponding heights
+    all_points = []
+    for height, contour in contours_with_heights.values():
+        points = contour.squeeze()
+        heights = np.full((points.shape[0], 1), height)
+        all_points.append(np.hstack((points, heights)))
+
+    # Combine all points into a single array
+    all_points = np.vstack(all_points)
+    
+    # Define the grid
+    grid_x, grid_y = np.mgrid[
+        all_points[:, 0].min():all_points[:, 0].max():grid_res*1j, 
+        all_points[:, 1].min():all_points[:, 1].max():grid_res*1j
+    ]
+
+    # Interpolate the heights
+    grid_z = griddata(all_points[:, :2], all_points[:, 2], (grid_x, grid_y), method='linear')
+
+    # Create the StructuredGrid
+    structured_grid = pv.StructuredGrid(grid_x, grid_y, grid_z)
+
+    return structured_grid
+
 def plot_gradient_mesh(mesh, colormap='viridis'):
     plotter = pv.Plotter()
     plotter.add_mesh(mesh, scalars=mesh.points[:, 2], cmap=colormap, show_edges=False)
     plotter.show_axes()
     plotter.show()
+
+def get_image_edge_contour(img_shape):
+    # Generate an edge contour for the image
+    edge_contour = np.array([
+        [[0, 0]],
+        [[0, img_shape[0]]],
+        [[img_shape[1], img_shape[0]]],
+        [[img_shape[1], 0]]
+    ])
+    return edge_contour
 
 def algorithmic(contours, img_shape):
     # This function gets a list of contours in the "find contours" format, and makes the algorithmic part
@@ -197,39 +235,51 @@ def algorithmic(contours, img_shape):
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
         if len(contour) > 1:
+            print(f"Contour {i} has {len(contour)} points")
             if is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
+                print(f"Contour {i} is closed")
                 closed_contour_dict[i] = contour
             else:
                 open_contour_dict[i] = contour
             all_contour_dict[i] = contour
+
+    plot_all_contours(all_contour_dict)
+
+    # print(f"Contour in number 0 is {closed_contour_dict[0]}")
 
     # for i, contour in enumerate(open_contour_dict):
     #     curvature = calculate_curvature_from_contour(contour, (0,0), i)
         # open_contour_dict[i] = close_open_contour(contour)
         # all_contour_dict[i] = close_open_contour(contour, curvature)
     
-    plot_all_contours(all_contour_dict)
 
-    for i, contour in open_contour_dict.items():
-        print(f"starting contour number {i}")
-        curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
-        print(f"Curvature of contour {i} is {curvature}")
+    # for i, contour in open_contour_dict.items():
+    #     print(f"starting contour number {i}")
+    #     curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
+    #     print(f"Curvature of contour {i} is {curvature}")
 
-    # father_dict = generate_fathers_dict(all_contour_dict, img_shape)
+    father_dict = generate_fathers_dict(closed_contour_dict, img_shape)
 
-    # # translate father_dict to a dictionary of contour_index: height
-    # contour_heights = father_to_heights(father_dict, all_contour_dict)  # dict of the shape {contour_number: height}
+    # translate father_dict to a dictionary of contour_index: height
+    contour_heights = father_to_heights(father_dict, closed_contour_dict)  # dict of the shape {contour_number: height}
 
-    # # zip the contours with their heights
-    # contour_with_heights = zip_contours_with_heights(all_contour_dict, contour_heights)
+    # Add the edges of the image as a contour
+    edge_contour = get_image_edge_contour(img_shape)
+    closed_contour_dict[-1] = edge_contour
+    contour_heights[-1] = 0
+
+    # zip the contours with their heights
+    contour_with_heights = zip_contours_with_heights(closed_contour_dict, contour_heights)
     
-    # # create mesh
-    # mesh = create_pyvista_mesh(contour_with_heights)
+    # create mesh
+    mesh = create_pyvista_mesh(contour_with_heights)
+    continuous_mesh = create_continuous_pyvista_mesh(contour_with_heights)
 
-    # # plot the mesh
-    # plot_gradient_mesh(mesh)
+    # plot the mesh
+    plot_gradient_mesh(mesh)
+    plot_gradient_mesh(continuous_mesh)
 
-    # # draw contours with heights in 3D, using pyvista. Complete mesh between the contours
-    # # and plot the 3D model
-    # # plot_3d_model_from_dict(contour_with_heights)
-    # print("Done")
+    # draw contours with heights in 3D, using pyvista. Complete mesh between the contours
+    # and plot the 3D model
+    # plot_3d_model_from_dict(contour_with_heights)
+    print("Done")
