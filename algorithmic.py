@@ -14,7 +14,7 @@ from scipy.interpolate import griddata, RectBivariateSpline
 DIFF = 60
 THRESH = 2.0
 THRESH_CLOSED = 0
-THRESH_EDGE = 1
+THRESH_EDGE = 5
 JUMP_EDGE = 0.1
 GRID_RES = 100
 

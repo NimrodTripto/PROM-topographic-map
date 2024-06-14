@@ -102,10 +102,8 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                     if(side==2 and y_point==0):
                         y_point = val
                 line1,line2 = generate_straight_line([x_point,0],[x2,0],0.2),generate_straight_line([x2,y_point],[x2,0],0.2)
-                # contour.extend(line1).extend(line2)
-                # print(contour.shape)
-                print(np.concatenate((contour, line1,line2), axis=0).shape)
                 return np.concatenate((contour, line1,line2), axis=0)
+            
 
     return contour
 
