@@ -100,6 +100,9 @@ def return_contained_contours(contour, all_contours):
 def find_father_contour(contour, contour_index, contour_dict, father_contours, img_shape):
     # We'll go over all contours, if we find a contour that i'm his son and not his grandson then he is my father
     for i, other_contour in contour_dict.items():
+        # Ensure that the contour is of the same shape
+        if not is_valid_contour_shape(other_contour):
+            raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
         if i != contour_index:
             index = 0
             while math.fabs(contour[index][0][0] - img_shape[0]) <= THRESH_EDGE and math.fabs(contour[index][0][1] - img_shape[1]) <= THRESH_EDGE:
