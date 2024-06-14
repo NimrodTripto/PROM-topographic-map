@@ -12,11 +12,11 @@ from scipy.interpolate import griddata, RectBivariateSpline
 
 
 DIFF = 60
-THRESH = 2.0
 THRESH_CLOSED = 0
-THRESH_EDGE = 5
-JUMP_EDGE = 0.1
-GRID_RES = 100
+THRESH_EDGE = 3
+JUMP_EDGE = 1
+GRID_RES = 200
+
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
     """
@@ -82,14 +82,38 @@ def plot_all_contours(contours):
     plt.title('All Contours')
     plt.show()
 
-def return_contained_contours(contour, all_contours):
+def is_close_to_edge(point, img_shape, thresh=THRESH_EDGE):
+    """
+    Check if the given point is close to the edge of the image.
+
+    Parameters:
+    point (tuple): The point to check.
+    img_shape (tuple): The shape of the image.
+    thresh (float): The threshold distance from the edge.
+
+    Returns:
+    bool: True if the point is close to the edge, False otherwise.
+    """
+    return math.fabs(point[0] - img_shape[0]) <= thresh or math.fabs(point[1] - img_shape[1]) <= thresh or point[0] <= thresh or point[1] <= thresh
+
+def return_contained_contours(contour, all_contours, img_shape):
     contained_contours = []
     for idx, other_contour in all_contours.items():
         if other_contour is not contour:
             if not is_valid_contour_shape(other_contour):
                 raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
+
+            # Ensure we don't go out of bounds
+            index = 0
+            while index < len(other_contour) and is_close_to_edge(other_contour[index][0], img_shape):
+                index += JUMP_EDGE
             
-            point = (int(other_contour[0][0][0]), int(other_contour[0][0][1]))
+            if index >= len(other_contour):
+                continue
+
+            # Convert the contours to the required type
+            other_contour = np.array(other_contour, dtype=np.float32)
+            point = (float(other_contour[index][0][0]), float(other_contour[index][0][1]))
 
             result = cv2.pointPolygonTest(contour, point, False)
 
@@ -105,18 +129,54 @@ def find_father_contour(contour, contour_index, contour_dict, father_contours, i
             raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
         if i != contour_index:
             index = 0
-            while math.fabs(contour[index][0][0] - img_shape[0]) <= THRESH_EDGE and math.fabs(contour[index][0][1] - img_shape[1]) <= THRESH_EDGE:
+            while index < len(other_contour) and is_close_to_edge(other_contour[index][0], img_shape):
                 index += JUMP_EDGE
-            if cv2.pointPolygonTest(other_contour, (int(contour[index][0][0]), int(contour[index][0][1])), False) == 1.0:
-                if not am_i_grandson(contour_index, i, contour_dict):
+
+            # Convert contours to the required type
+            other_contour = np.array(other_contour, dtype=np.float32)
+            contour_point = (float(contour[index][0][0]), float(contour[index][0][1]))
+
+            # if i == 11 and contour_index == 10:
+            #     print(f"Got to the point of checking if {contour_index} is a grandson of {i}")
+            #     print(f"my point is {contour_point}")
+            #     print(f"Point polygon test for {i} is {cv2.pointPolygonTest(other_contour, contour_point, False)}")
+            #     # take another point with 50 x to the left
+            #     other_point = (contour_point[0] - 250, contour_point[1])
+            #     print(f"Point polygon test for other point is {cv2.pointPolygonTest(other_contour, other_point, False)}")
+            #     # plot the point with the contour
+            #     plt.figure()
+            #     plt.plot(other_contour[:, 0, 0], other_contour[:, 0, 1])
+            #     plt.scatter(contour_point[0], contour_point[1], c='r')
+            #     plt.scatter(other_point[0], other_point[1], c='g')
+            #     plt.show()
+
+            if cv2.pointPolygonTest(other_contour, contour_point, False) == 1.0:
+                if not am_i_grandson(contour_index, i, contour_dict, img_shape):
                     return i
     return None
 
-def am_i_grandson(contour_index_1, contour_index_2, contour_dict):  # this function checks if contour 1 is a grandson of contour 2
-    contained_in_2 = return_contained_contours(contour_dict[contour_index_2], contour_dict)
+def am_i_grandson(contour_index_1, contour_index_2, contour_dict, img_shape):  # this function checks if contour 1 is a grandson of contour 2
+    contained_in_2 = return_contained_contours(contour_dict[contour_index_2], contour_dict, img_shape)
     for contained in contained_in_2:
-        # for each contour contained in contour 2, check if it contains contour 1
-        if cv2.pointPolygonTest(contour_dict[contained], (int(contour_dict[contour_index_1][0][0][0]), int(contour_dict[contour_index_1][0][0][1])), False) == 1.0:
+        contour_1 = contour_dict[contour_index_1]
+        
+        # Ensure the contour is of the correct shape
+        if not is_valid_contour_shape(contour_1):
+            raise ValueError(f"Contour format is incorrect. Expected shape is (N, 1, 2). Got shape {contour_1.shape}")
+
+        index = 0
+        while index < len(contour_1) and is_close_to_edge(contour_1[index][0], img_shape):
+            index += JUMP_EDGE
+        
+        # Ensure we don't go out of bounds
+        if index >= len(contour_1):
+            continue
+        
+        # Convert the contours to the required type
+        contained_contour = np.array(contour_dict[contained], dtype=np.int32)
+        contour_point = (int(contour_1[index][0][0]), int(contour_1[index][0][1]))
+
+        if cv2.pointPolygonTest(contained_contour, contour_point, False) == 1.0:
             return True
     return False
 
@@ -222,6 +282,40 @@ def get_image_edge_contour(img_shape):
     ])
     return edge_contour
 
+def draw_and_extract_contours(contour_dict, img_shape, padding=100):
+    reprocessed_contours = {}
+
+    for i, contour in contour_dict.items():
+        # Ensure the contour is of the correct type and not empty
+        contour = np.array(contour, dtype=np.int32)
+        if contour.size == 0:
+            continue
+
+        # Calculate contour bounding box
+        x, y, w, h = cv2.boundingRect(contour)
+
+        # Create a new blank image with sufficient padding
+        new_img_shape = (max(img_shape[0], y + h + padding), max(img_shape[1], x + w + padding))
+        img = np.zeros(new_img_shape, dtype=np.uint8)
+
+        # Shift the contour by padding amount to ensure it fits within the new image
+        shifted_contour = contour + padding
+
+        # Draw the shifted contour on the image
+        cv2.drawContours(img, [shifted_contour], -1, (255), thickness=cv2.FILLED)
+
+        # Extract contours from the image
+        extracted_contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Ensure only one contour is found
+        if len(extracted_contours) != 1:
+            raise ValueError(f"Expected exactly one contour to be found on the image, but found {len(extracted_contours)}")
+
+        # Shift the contour back to its original position
+        reprocessed_contours[i] = extracted_contours[0] - padding
+
+    return reprocessed_contours
+
 def algorithmic(contours, img_shape):
     # This function gets a list of contours in the "find contours" format, and makes the algorithmic part
     # so that it will be able, in the end, to model the map
@@ -235,6 +329,7 @@ def algorithmic(contours, img_shape):
     closed_contour_dict = {}
     open_contour_dict = {}
     all_contour_dict = {}
+    redraw_dict = {}
 
     # for i, contour in enumerate(contours):
     #     # only add contours with more than 1 point
@@ -254,12 +349,16 @@ def algorithmic(contours, img_shape):
                 curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
                 print(f"curve is: {curvature}")
                 contour = close_open_contour(contour,img_shape,curvature,2)
+                redraw_dict[i] = contour
             if not is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
                 print("very bad")
             closed_contour_dict[i] = contour
             all_contour_dict[i] = contour
-
-    plot_all_contours(all_contour_dict)
+    
+    redraw_dict = draw_and_extract_contours(redraw_dict, img_shape)
+    for i, contour in redraw_dict.items():
+        closed_contour_dict[i] = contour
+        all_contour_dict[i] = contour
 
     # print(f"Contour in number 0 is {closed_contour_dict[0]}")
 
@@ -275,6 +374,10 @@ def algorithmic(contours, img_shape):
     #     print(f"Curvature of contour {i} is {curvature}")
 
     father_dict = generate_fathers_dict(closed_contour_dict, img_shape)
+
+    print(f"Father dict is {father_dict}")
+
+    plot_all_contours(all_contour_dict)
 
     # translate father_dict to a dictionary of contour_index: height
     contour_heights = father_to_heights(father_dict, closed_contour_dict)  # dict of the shape {contour_number: height}

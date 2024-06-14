@@ -13,7 +13,8 @@ from scipy.interpolate import UnivariateSpline
 
 PART_LENGTH = 50  # in pixels
 BIN_SIZE = 0.01  # in radians
-STRAIGHT_SIZE = 0.1
+STRAIGHT_SIZE = 0.2
+SAME_LINE_THRESH = 4
 
 # # types: 1 - only one face touched, 2 - two adjacent faces touched, 3 - two nonAdjacent faces touched
 # def contour_type(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
@@ -66,43 +67,201 @@ STRAIGHT_SIZE = 0.1
     #     r
 
 def close_open_contour(contour, img_shape, curvature,thresh = 2):
-    if(curvature>0):
-        all_faces_with_value = []
-        all_faces = set()
-        contour_points = contour.squeeze()
-        first_point, second_point = [0,0], [img_shape[1],img_shape[0]]
-        x1, y1 = first_point[0], first_point[1]
-        x2, y2 = second_point[0], second_point[1]
-        # print(f"x2: {x2}")
-        # print(f"y2: {y2}")
-        
-        # Check the first condition
-        for point in contour_points:
-            x, y = point[0], point[1]
-            if np.abs(y - y1) <= thresh and 1 not in all_faces:
-                all_faces_with_value.append((1,x))
-                all_faces.add(1)
-            if np.abs(y - y2) <= thresh and 3 not in all_faces:
-                all_faces_with_value.append((3,x))
-                all_faces.add(3)
-            if np.abs(x - x1) <= thresh and 4 not in all_faces:
-                all_faces_with_value.append((4,y))
-                all_faces.add(4)
-            if np.abs(x - x2) <= thresh and 2 not in all_faces:
-                all_faces_with_value.append((2,y))
-                all_faces.add(2)
+    all_faces_with_value = []
+    all_faces = set()
+    contour_points = contour.squeeze()
+    first_point, second_point = [0,0], [img_shape[1],img_shape[0]]
+    x1, y1 = first_point[0], first_point[1]
+    x2, y2 = second_point[0], second_point[1]
+    # print(f"x2: {x2}")
+    # print(f"y2: {y2}")
+    
+    # Check the first condition
+    for point in contour_points:
+        x, y = point[0], point[1]
+        if np.abs(y - y1) <= thresh and 1 not in all_faces:
+            all_faces_with_value.append((1,x))
+            all_faces.add(1)
+        if np.abs(y - y2) <= thresh and 3 not in all_faces:
+            all_faces_with_value.append((3,x))
+            all_faces.add(3)
+        if np.abs(x - x1) <= thresh and 4 not in all_faces:
+            all_faces_with_value.append((4,y))
+            all_faces.add(4)
+        if np.abs(x - x2) <= thresh and 2 not in all_faces:
+            all_faces_with_value.append((2,y))
+            all_faces.add(2)
+    
+    if(len(all_faces)==1):
+        if(1 in all_faces):
+            x_point_1,x_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if(x_point_1==0):
+                    x_point_1 = val
+                elif (math.abs(val-x_point_1)>SAME_LINE_THRESH):
+                    x_point_2 = val
+            line = generate_straight_line([math.min(x_point_1,x_point_2),0],[math.max(x_point_1,x_point_2),0],STRAIGHT_SIZE)
+        elif(3 in all_faces):
+            x_point_1,x_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if(x_point_1==0):
+                    x_point_1 = val
+                elif (math.abs(val-x_point_1)>SAME_LINE_THRESH):
+                    x_point_2 = val
+            line = generate_straight_line([math.min(x_point_1,x_point_2),y2],[math.max(x_point_1,x_point_2),y2],STRAIGHT_SIZE)
+        elif(2 in all_faces):
+            y_point_1,y_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if(y_point_1==0):
+                    y_point_1 = val
+                elif (math.abs(val-y_point_1)>SAME_LINE_THRESH):
+                    y_point_2 = val
+            line = generate_straight_line([x2,math.min(y_point_1,y_point_2)],[x2,math.max(y_point_1,y_point_2)],STRAIGHT_SIZE)
+        else:
+            y_point_1,y_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if(y_point_1==0):
+                    y_point_1 = val
+                elif (math.abs(val-y_point_1)>SAME_LINE_THRESH):
+                    y_point_2 = val
+            line = generate_straight_line([0,math.min(y_point_1,y_point_2)],[0,math.max(y_point_1,y_point_2)],STRAIGHT_SIZE)
+        return np.concatenate((contour, line), axis=0)
+    if(curvature>=0):
         # print(f"all faces: {all_faces_with_value}")
-        if(len(all_faces)==2):
-            # print("got here")
-            if(1 in all_faces and 2 in all_faces):
-                x_point,y_point = 0,0
-                for side,val in all_faces_with_value:
-                    if(side==1 and x_point==0):
-                        x_point = val
-                    if(side==2 and y_point==0):
-                        y_point = val
-                line1,line2 = generate_straight_line([x_point,0],[x2,0],0.2),generate_straight_line([x2,y_point],[x2,0],0.2)
-                return np.concatenate((contour, line1,line2), axis=0)
+        # print("got here")
+        flag = False
+        if(1 in all_faces and 2 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,y_point],[x2,0],STRAIGHT_SIZE)
+        elif(1 in all_faces and 4 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,0],[0,0],STRAIGHT_SIZE),generate_straight_line([0,y_point],[0,0],STRAIGHT_SIZE)
+        elif(2 in all_faces and 3 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y_point],[x2,y2],STRAIGHT_SIZE)
+        elif(3 in all_faces and 4 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,y2],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y_point],[0,y2],STRAIGHT_SIZE)
+        else:
+            flag = True
+        if (not flag):
+            return np.concatenate((contour, line1,line2), axis=0)
+        if(1 in all_faces and 3 in all_faces):
+            x_point_1,x_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if((side-1)/2==0 and x_point_1==0):
+                    x_point_1 = val
+                if((side-1)/2==1 and x_point_2==0):
+                    x_point_2 = val
+            if(x_point_1+x_point_2>=x2):
+                line1,line2,line3 = generate_straight_line([x_point_1,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x_point_2,y2],STRAIGHT_SIZE)
+            else:
+                line1,line2,line3 = generate_straight_line([x_point_1,0],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x_point_2,y2],STRAIGHT_SIZE)
+        elif(2 in all_faces and 4 in all_faces):
+            y_point_1,y_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if((side-1)/2==1 and y_point_1==0):
+                    y_point_1 = val
+                if((side-1)/2==0 and y_point_2==0):
+                    y_point_2 = val
+            if(y_point_1+y_point_2>=y2):
+                line1,line2,line3 = generate_straight_line([0,y_point_1],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x2,y_point_2],STRAIGHT_SIZE)
+            else:
+                line1,line2,line3 = generate_straight_line([0,y_point_1],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y_point_2],STRAIGHT_SIZE)
+        return np.concatenate((contour, line1,line2,line3), axis=0)
+    else:
+        # print(f"all faces: {all_faces_with_value}")
+        # print("got here")
+        flag = False
+        if(1 in all_faces and 2 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,0],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[0,y2],STRAIGHT_SIZE)
+            line3,line4 = generate_straight_line([0,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x2,y_point],STRAIGHT_SIZE)
+        elif(1 in all_faces and 4 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y2],STRAIGHT_SIZE)
+            line3,line4 = generate_straight_line([x2,y2],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[0,y_point],STRAIGHT_SIZE)
+        elif(2 in all_faces and 3 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,y2],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[0,0],STRAIGHT_SIZE)
+            line3,line4 = generate_straight_line([0,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y_point],STRAIGHT_SIZE)
+        elif(3 in all_faces and 4 in all_faces):
+            x_point,y_point = 0,0
+            for side,val in all_faces_with_value:
+                if(side%2==1 and x_point==0):
+                    x_point = val
+                if(side%2==0 and y_point==0):
+                    y_point = val
+            line1,line2 = generate_straight_line([x_point,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x2,0],STRAIGHT_SIZE)
+            line3,line4 = generate_straight_line([x2,0],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[0,y_point],STRAIGHT_SIZE)
+        else:
+            flag = True
+        if (not flag):
+            return np.concatenate((contour, line1,line2,line3,line4), axis=0)
+        if(1 in all_faces and 3 in all_faces):
+            x_point_1,x_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if((side-1)/2==0 and x_point_1==0):
+                    x_point_1 = val
+                if((side-1)/2==1 and x_point_2==0):
+                    x_point_2 = val
+            if(x_point_1+x_point_2<x2):
+                line1,line2,line3 = generate_straight_line([x_point_1,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x_point_2,y2],STRAIGHT_SIZE)
+            else:
+                line1,line2,line3 = generate_straight_line([x_point_1,0],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x_point_2,y2],STRAIGHT_SIZE)
+        elif(2 in all_faces and 4 in all_faces):
+            y_point_1,y_point_2 = 0,0
+            for side,val in all_faces_with_value:
+                if((side-1)/2==1 and y_point_1==0):
+                    y_point_1 = val
+                if((side-1)/2==0 and y_point_2==0):
+                    y_point_2 = val
+            if(y_point_1+y_point_2<y2):
+                line1,line2,line3 = generate_straight_line([0,y_point_1],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x2,y_point_2],STRAIGHT_SIZE)
+            else:
+                line1,line2,line3 = generate_straight_line([0,y_point_1],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y_point_2],STRAIGHT_SIZE)
+        return np.concatenate((contour, line1,line2,line3), axis=0)
+        
+            
+        
+            
+        
+            
             
 
     return contour
