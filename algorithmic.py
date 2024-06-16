@@ -17,7 +17,7 @@ DIFF = 60
 THRESH_CLOSED = 0
 THRESH_EDGE = 3
 JUMP_EDGE = 1
-GRID_RES = 200
+GRID_RES = 100
 
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
@@ -175,7 +175,7 @@ def return_contained_contours(contour, all_contours, img_shape):
                 continue
 
             # Convert the contours to the required type
-            other_contour = np.array(other_contour, dtype=np.float32)
+            contour = np.array(contour, dtype=np.float32)
             point = (float(other_contour[index][0][0]), float(other_contour[index][0][1]))
 
             result = cv2.pointPolygonTest(contour, point, False)
@@ -352,26 +352,43 @@ def draw_and_extract_contours(contour_dict, img_shape, padding=100):
         # Ensure the contour is of the correct type and not empty
         contour = np.array(contour, dtype=np.float32)
         if contour.size == 0:
+            print(f"Contour {i} is empty initially.")
             continue
+
+        # Visualize the original contour
+        # plot_contours({i: contour}, img_shape, f"Original Contour {i}")
 
         # Calculate contour bounding box
         x, y, w, h = cv2.boundingRect(contour)
 
         # Create a new blank image with sufficient padding
-        new_img_shape = (img_shape[0] + 2 * padding, img_shape[1] + 2 * padding)
+        new_img_shape = (h + 2 * padding, w + 2 * padding)
         img = np.zeros(new_img_shape, dtype=np.uint8)
 
-        # Shift the contour to ensure it fits within the new image
-        shifted_contour = contour + padding
+        # Shift the contour by padding amount to ensure it fits within the new image
+        shift_x = padding - x
+        shift_y = padding - y
+        shifted_contour = contour + [shift_x, shift_y]
 
-        # Ensure the shifted contour is not empty
-        if shifted_contour.size == 0:
-            print(f"Contour {i} is empty after shifting.")
+        # Visualize the shifted contour
+        # plot_contours({i: shifted_contour}, new_img_shape, f"Shifted Contour {i}")
+
+        # Ensure the shifted contour has the correct shape
+        if shifted_contour.size == 0 or len(shifted_contour.shape) != 3 or shifted_contour.shape[1] != 1 or shifted_contour.shape[2] != 2:
+            print(f"Contour {i} has invalid shape after shifting: {shifted_contour.shape}")
             continue
+
+        # Check for and handle invalid values in shifted_contour
+        if not np.all(np.isfinite(shifted_contour)):
+            print(f"Contour {i} has invalid values after shifting: {shifted_contour}")
+            shifted_contour = np.nan_to_num(shifted_contour)
+
+        # Convert to int for drawing
+        shifted_contour_int = shifted_contour.astype(np.int32)
 
         # Draw the shifted contour on the image
         try:
-            cv2.drawContours(img, [shifted_contour], -1, (255), thickness=cv2.FILLED)
+            cv2.drawContours(img, [shifted_contour_int], -1, (255), thickness=cv2.FILLED)
         except cv2.error as e:
             print(f"Error drawing contour {i}: {e}")
             continue
@@ -385,9 +402,24 @@ def draw_and_extract_contours(contour_dict, img_shape, padding=100):
             continue
 
         # Shift the contour back to its original position
-        reprocessed_contours[i] = extracted_contours[0] - padding
+        reprocessed_contours[i] = extracted_contours[0].astype(np.float32) - [shift_x, shift_y]
+
+        # Visualize the reprocessed contour
+        # plot_contours({i: reprocessed_contours[i]}, img_shape, f"Reprocessed Contour {i}")
 
     return reprocessed_contours
+
+def plot_contours(contours, img_shape, title):
+    plt.figure(figsize=(10, 8))
+    for i, contour in contours.items():
+        plt.plot(contour[:, 0, 0], contour[:, 0, 1], label=f"Contour {i}")
+    plt.xlim([0, img_shape[1]])
+    plt.ylim([img_shape[0], 0])
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.title(title)
+    plt.legend()
+    plt.show()
+
 
 def algorithmic(contours, img_shape):
     # This function gets a list of contours in the "find contours" format, and makes the algorithmic part
@@ -433,13 +465,13 @@ def algorithmic(contours, img_shape):
 
     # Search for contours that are in a horrible case
     # If there are such contours, merge them
-    for i, contour in contour_dict.items():
-        for j, other_contour in contour_dict.items():
-            if i != j and check_if_horrible_case(contour, other_contour, img_shape):
-                merged_contour = merge_contours(contour, other_contour)
-                contour_dict[i] = merged_contour
-                del contour_dict[j]
-                break
+    # for i, contour in contour_dict.items():
+    #     for j, other_contour in contour_dict.items():
+    #         if i != j and check_if_horrible_case(contour, other_contour, img_shape):
+    #             merged_contour = merge_contours(contour, other_contour)
+    #             contour_dict[i] = merged_contour
+    #             del contour_dict[j]
+    #             break
 
     # print(f"Contour in number 0 is {closed_contour_dict[0]}")
 
