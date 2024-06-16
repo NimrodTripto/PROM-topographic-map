@@ -220,7 +220,7 @@ def main(img_path):
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
     for i in range(len(contours_after)-1,-1,-1):
-        if(i!=9):
+        if(i==0):
             contours_after.pop(i)
     # algorithmic([contours[15]], img.shape[:2])
     algorithmic(contours_after, img.shape[:2])

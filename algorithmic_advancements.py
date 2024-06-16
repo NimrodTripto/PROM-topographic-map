@@ -10,6 +10,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from scipy.integrate import simps
 from scipy.interpolate import UnivariateSpline
+from copy import deepcopy
 
 PART_LENGTH = 50  # in pixels
 BIN_SIZE = 0.01  # in radians
@@ -125,17 +126,39 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                 elif (math.fabs(val-y_point_1)>SAME_LINE_THRESH):
                     y_point_2 = val
             line = generate_straight_line([0,min(y_point_1,y_point_2)],[0,max(y_point_1,y_point_2)],STRAIGHT_SIZE)
-        return np.concatenate((contour, line), axis=0)
+        return [contour, line]
     if(len(all_faces)==2):
         if(math.fabs(all_faces[0]-all_faces[1])==2):
             if(all_faces[0]%2==0):
                 curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), option = 2)
+                y_point_1,y_point_2 = 0,0
+                for side,val in all_faces_with_value:
+                    print(f"have: {(side,val)}")
+                    if(int((side-1)/2)==1 and y_point_1==0):
+                        y_point_1 = val
+                    if(int((side-1)/2)==0 and y_point_2==0):
+                        y_point_2 = val
+                if(curvature>=0):
+                    line1,line2,line3 = generate_straight_line([0,y_point_1],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x2,y_point_2],STRAIGHT_SIZE)
+                else:
+                    # print(f"y_point1: {y_point_1},y_point2: {y_point_2}")
+                    line1,line2,line3 = generate_straight_line([0,y_point_1],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y_point_2],STRAIGHT_SIZE)
                 print(f"curvat1 is {curvature}")
-                return None
+                return [contour, line1,line2,line3]
             else:
                 curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), option = 1)
+                x_point_1,x_point_2 = 0,0
+                for side,val in all_faces_with_value:
+                    if(int((side-1)/2)==0 and x_point_1==0):
+                        x_point_1 = val
+                    if(int((side-1)/2)==1 and x_point_2==0):
+                        x_point_2 = val
+                if(curvature>=0):
+                    line1,line2,line3 = generate_straight_line([x_point_1,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x_point_2,y2],STRAIGHT_SIZE)
+                else:
+                    line1,line2,line3 = generate_straight_line([x_point_1,0],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x_point_2,y2],STRAIGHT_SIZE)
                 print(f"curvat is {curvature}")
-                return None
+                return [contour, line1,line2,line3]
     if(curvature>=0):
         print("poso")
         print(f"all faces: {all_faces_with_value}")
@@ -176,7 +199,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
         else:
             flag = True
         if (not flag):
-            return np.concatenate((contour, line1,line2), axis=0)
+            return [contour, line1,line2]
         if(1 in all_faces and 3 in all_faces):
             x_point_1,x_point_2 = 0,0
             for side,val in all_faces_with_value:
@@ -200,7 +223,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
                 line1,line2,line3 = generate_straight_line([0,y_point_1],[0,y2],STRAIGHT_SIZE),generate_straight_line([0,y2],[x2,y2],STRAIGHT_SIZE),generate_straight_line([x2,y2],[x2,y_point_2],STRAIGHT_SIZE)
             else:
                 line1,line2,line3 = generate_straight_line([0,y_point_1],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y_point_2],STRAIGHT_SIZE)
-        return np.concatenate((contour, line1,line2,line3), axis=0)
+        return [contour, line1,line2,line3]
     else:
         print("nega")
         print(f"all faces: {all_faces_with_value}")
@@ -245,7 +268,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
         else:
             flag = True
         if (not flag):
-            return np.concatenate((contour, line1,line2,line3,line4), axis=0)
+            return [contour, line1,line2,line3,line4]
         if(1 in all_faces and 3 in all_faces):
             x_point_1,x_point_2 = 0,0
             for side,val in all_faces_with_value:
@@ -271,7 +294,7 @@ def close_open_contour(contour, img_shape, curvature,thresh = 2):
             else:
                 print(f"y_point1: {y_point_1},y_point2: {y_point_2}")
                 line1,line2,line3 = generate_straight_line([0,y_point_1],[0,0],STRAIGHT_SIZE),generate_straight_line([0,0],[x2,0],STRAIGHT_SIZE),generate_straight_line([x2,0],[x2,y_point_2],STRAIGHT_SIZE)
-        return np.concatenate((contour, line1,line2,line3), axis=0)
+        return [contour, line1,line2,line3]
         
             
         
@@ -327,22 +350,94 @@ def curvature(r, theta):
     
     return numerator / denominator
 
-# option = 0 is rtheta, 1 is xy, and 2 is yx
-def calculate_curvature(data, smoothing_factor=0.5,option = 0):
+def organize_data_for_spline(data, option=0):
+    """
+    Organizes the data (r, theta) in the correct order for spline fitting.
+    
+    Parameters:
+    data (array-like): 2D array-like with columns [r, theta].
+    option (int): If 2, swaps r and theta and sorts accordingly.
+
+    Returns:
+    tuple: Sorted and possibly swapped (theta, r) arrays.
+    """
     data = np.array(data)
     theta = data[:, 1]
     r = data[:, 0]
-    # Sort the data by theta
-    sorted_indices = np.argsort(theta)
+
+    if option == 2:  # Swap 'em
+        theta, r = r, theta  # Swap variables
+        sorted_indices = np.argsort(theta)  # Sort by the new independent variable (theta after swap)
+    else:
+        sorted_indices = np.argsort(theta)  # Sort by theta
+
     theta = theta[sorted_indices]
     r = r[sorted_indices]
-    if(option==2): #swap 'em
-        sorted_indices = np.argsort(r)
-        theta = theta[sorted_indices]
-        r = r[sorted_indices]
-        temp = r
-        r = theta
-        theta = temp
+
+    # Zip the sorted data to be able to call the one-to-one function
+    sorted_data = list(zip(r, theta))
+
+    # Call the one-to-one function
+    sorted_data = one_to_one_function(sorted_data)
+
+    # Unzip the sorted data
+    r, theta = zip(*sorted_data)
+    
+    return theta, r
+
+def check_data_for_spline(theta, r):
+    """
+    Checks if the data (r, theta) are suitable for spline fitting.
+    
+    Parameters:
+    theta (array-like): Independent variable (e.g., angle in radians).
+    r (array-like): Dependent variable (e.g., radius).
+
+    Raises:
+    ValueError: If the data is not suitable for spline fitting.
+    """
+    theta = np.array(theta)
+    r = np.array(r)
+
+    # Check if theta and r have the same length
+    if len(theta) != len(r):
+        raise ValueError("Theta and r must have the same length.")
+
+    # Check if there are enough data points
+    if len(theta) < 4:
+        raise ValueError("Not enough data points for spline fitting. At least 4 points are required.")
+
+    # Check if theta is sorted
+    if not np.all(np.diff(theta) > 0):
+        raise ValueError("Theta values must be in strictly increasing order.")
+
+    # Check for any NaN or infinite values
+    if np.any(np.isnan(theta)) or np.any(np.isnan(r)):
+        raise ValueError("Theta and r must not contain NaN values.")
+    if np.any(np.isinf(theta)) or np.any(np.isinf(r)):
+        raise ValueError("Theta and r must not contain infinite values.")
+
+    return True
+
+def calculate_curvature(input_data, smoothing_factor=0.5, option=0):
+    # Work with a copy of the data, not the original, using deep copy
+    data = deepcopy(input_data)
+
+    # Organize the data for spline fitting
+    theta, r = organize_data_for_spline(data, option=option)
+
+    # # plot the contour
+    # plt.figure()
+    # plt.plot(theta, r, label='Contour Segment')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Radius (r)')
+    # plt.title(f'Contour Segment in r(θ) Space')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+
+    # Check if the data is suitable for spline fitting
+    check_data_for_spline(theta, r)
 
     # Fit a spline to the data
     spline = UnivariateSpline(theta, r, s=smoothing_factor)
@@ -365,23 +460,13 @@ def calculate_curvature(data, smoothing_factor=0.5,option = 0):
         nature = "sad"
 
     # Plot the original data and the spline
-    plt.figure(figsize=(8, 6))
-    plt.plot(theta, r, 'o', label='Data points')
-    plt.plot(theta_dense, spline(theta_dense), '-', label='Fitted spline')
-    plt.xlabel('Theta (radians)')
-    plt.ylabel('Radius (r)')
-    plt.legend()
-    plt.title(f"The function is mostly '{nature}'")
-    plt.show()
-
-    # # Plot the second derivative to visualize curvature
     # plt.figure(figsize=(8, 6))
-    # plt.plot(theta_dense, second_derivative_values, label='Second Derivative')
-    # plt.axhline(0, color='black', linewidth=0.5, linestyle='--')
-    # plt.xlabel('Theta (radians)')
-    # plt.ylabel('Second Derivative')
+    # plt.plot(theta, r, 'o', label='Data points')
+    # plt.plot(theta_dense, spline(theta_dense), '-', label='Fitted spline')
+    # plt.xlabel('Theta (radians)' if option != 2 else 'Radius (r)')
+    # plt.ylabel('Radius (r)' if option != 2 else 'Theta (radians)')
     # plt.legend()
-    # plt.title("Second Derivative of the Fitted Spline")
+    # plt.title(f"The function is mostly '{nature}'")
     # plt.show()
 
     return total_curvature, nature
@@ -519,6 +604,18 @@ def one_to_one_function(contour, bin_size=BIN_SIZE):
             avg_theta = np.mean(theta[indices])
             binned_r_theta.append((avg_r, avg_theta))
     
+    # plot the original data and the binned data on the same plot
+    # plt.figure()
+    # plt.plot(theta, r, 'o', label='Original Data')
+    # binned_r, binned_theta = zip(*binned_r_theta)
+    # plt.plot(binned_theta, binned_r, 'x', label='Binned Data')
+    # plt.xlabel('Theta (radians)')
+    # plt.ylabel('Radius (r)')
+    # plt.title('Original and Binned Data')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+
     # print(f"Binned r-theta pairs are: {binned_r_theta}")
     return binned_r_theta
 
@@ -543,19 +640,20 @@ def plot_r_theta(r_theta, contour_index=0, title='Contour Segment in r(θ) Space
     plt.grid(True)
     plt.show()
 
-def calculate_curvature_from_contour(contour, middle_point, contour_index=0,option = 0):
+def calculate_curvature_from_contour(input_contour, middle_point, contour_index=0, option = 0):
     print(f"middle is: {middle_point}")
+    # Work with a copy of the data, not the original, using deep copy
+    contour = deepcopy(input_contour)
     if(option==0):
         r_theta = contour_to_r_theta(contour, middle_point)
         # Plotting the contour segment in r(theta) space
         #plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space')
-        r_theta = one_to_one_function(r_theta)
         # Print all r values where theta is -0.8+-0.03 and print them
         # for r, theta in r_theta:
         #     if theta < -0.8 and theta > -0.86:
         #         print(f"r: {r}, theta: {theta}")
         # Plotting the contour segment in r(theta) space
-        plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space, one to one')
+        # plot_r_theta(r_theta, contour_index, f'Contour Segment of {contour_index} in r(θ) Space, one to one')
         # divided = divide_contour(r_theta)
         # total_curvature = 0
         # for part in divided:
@@ -582,11 +680,12 @@ def calculate_curvature_from_contour(contour, middle_point, contour_index=0,opti
         # plt.show()
         return total_curv[0]
     elif(option == 1):
-        plot_r_theta(contour.squeeze(), contour_index, f'Contour Segment of {contour_index} in xy Space, one to one')
+        # plot_r_theta(contour.squeeze(), contour_index, f'Contour Segment of {contour_index} in xy Space, one to one')
         total_curv = calculate_curvature(contour.squeeze(),option=option)
         return total_curv[0]
     elif(option==2):
-        plot_r_theta(contour.squeeze(), contour_index, f'Contour Segment of {contour_index} in yx Space, one to one',toFlip=True)
+        # print(f"Data is: {contour}")
+        # plot_r_theta(contour.squeeze(), contour_index, f'Contour Segment of {contour_index} in yx Space, one to one',toFlip=True)
         total_curv = calculate_curvature(contour.squeeze(),option=option)
         return total_curv[0]
 

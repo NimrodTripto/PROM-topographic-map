@@ -103,10 +103,10 @@ def merge_contours(contour1, contour2, tolerance=MERGE_THRESH):
     # Remove duplicates by rounding and converting to a set
     merged_points = np.unique(np.round(merged_points), axis=0)
     
-    # Reshape to contour format
-    merged_contour = merged_points[:, np.newaxis, :]
-    
-    return merged_contour
+    # Compute the convex hull to get the outline of the merged contour
+    hull = cv2.convexHull(merged_points.astype(np.float32))
+
+    return hull
 
 def is_valid_contour_shape(array):
     """
@@ -125,6 +125,25 @@ def is_valid_contour_shape(array):
     if array.shape[1] != 1 or array.shape[2] != 2:
         return False
     return True
+
+def plot_all_contours_scatter(contours):
+    """
+    Plot all contours in the given dictionary using scatter plots.
+
+    Parameters:
+    contours (dict): Dictionary of contours.
+    """
+    plt.figure()
+    for i, (idx, contour) in enumerate(reversed(contours.items())):
+        if not is_valid_contour_shape(contour):
+            raise ValueError(f"Contour format is incorrect. Expected shape is (N, 1, 2). Got shape {contour.shape}")
+        contour_points = contour.squeeze()
+        plt.scatter(contour_points[:, 0], contour_points[:, 1], label=f'Contour {idx}', s=10)  # s=10 sets the marker size
+    plt.legend()
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('All Contours (Scatter)')
+    plt.show()
 
 def plot_all_contours(contours):
     """
@@ -433,6 +452,7 @@ def algorithmic(contours, img_shape):
     # pass all the closed contours to a given dictionary, while numbering the contours by some order
     contour_dict = {}
     redraw_dict = {}
+    unedited = {}
 
     # for i, contour in enumerate(contours):
     #     # only add contours with more than 1 point
@@ -448,18 +468,24 @@ def algorithmic(contours, img_shape):
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
         if len(contour) > 1:
+            unedited[i] = contour
             if not is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
                 curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
                 print(f"curve is: {curvature}")
-                contour = close_open_contour(contour,img_shape,curvature,2)
-                plt.figure()
-                contour_points = contour.squeeze()
-                plt.scatter(contour_points[:, 0], contour_points[:, 1], label=f'this is Contour {0}')
-                plt.legend()
-                plt.xlabel('X')
-                plt.ylabel('Y')
-                plt.title('All Contours')
-                plt.show()
+                # Added will be a list of [contour, added line, added line, ...]
+                added = close_open_contour(contour,img_shape,curvature,2)
+                # # Make added a numpy array of points only, where right now it's a list of [line, line, ...]
+                added = np.array([point for line in added[1:] for point in line])
+                # # add the lines to the contour with np concatenate
+                # contour = np.concatenate((contour, added), axis=0)
+                contour = added
+                # plt.figure()
+                # plt.scatter(contour_points[:, 0], contour_points[:, 1], label=f'this is Contour {0}')
+                # plt.legend()
+                # plt.xlabel('X')
+                # plt.ylabel('Y')
+                # plt.title('All Contours')
+                # plt.show()
                 redraw_dict[i] = contour
             if not is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
                 print("very bad")
@@ -469,17 +495,36 @@ def algorithmic(contours, img_shape):
     for i, contour in redraw_dict.items():
         contour_dict[i] = contour
 
-    plot_all_contours(contour_dict)
+    # merge unedited and redraw_dict
+    merged = {}
+    for i, contour in unedited.items():
+        merged[i] = contour
+    for i, contour in redraw_dict.items():
+        merged[i + len(unedited)] = contour
+    # plot_all_contours(unedited)
+    plot_all_contours(merged)
 
-    # Search for contours that are in a horrible case
-    # If there are such contours, merge them
-    # for i, contour in contour_dict.items():
-    #     for j, other_contour in contour_dict.items():
-    #         if i != j and check_if_horrible_case(contour, other_contour, img_shape):
-    #             merged_contour = merge_contours(contour, other_contour)
-    #             contour_dict[i] = merged_contour
-    #             del contour_dict[j]
-    #             break
+    # Create a set to keep track of contours that have been merged
+    to_delete = set()
+    to_merge = {}
+
+    for i, contour in contour_dict.items():
+        if i in to_delete:
+            continue
+        for j, other_contour in contour_dict.items():
+            if i != j and j not in to_delete and check_if_horrible_case(contour, other_contour, img_shape):
+                merged_contour = merge_contours(contour, other_contour)
+                to_merge[i] = merged_contour
+                to_delete.add(j)
+                break
+
+    # Update the dictionary with merged contours
+    for i, merged_contour in to_merge.items():
+        contour_dict[i] = merged_contour
+
+    # Remove merged contours from the dictionary
+    for j in to_delete:
+        del contour_dict[j]
 
     # print(f"Contour in number 0 is {closed_contour_dict[0]}")
 
