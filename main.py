@@ -170,7 +170,7 @@ def remove_duplicate_contours(contours, threshold=10):
     return unique_contours
 
 # Remove duplicate contours based on intersection area threshold
-def remove_small_contours(contours, threshold=10):
+def remove_small_contours(contours, threshold=100):
     # Indices of contours to be removed
     remove_indices = []
     white_img = cv2.imread('images\white_img.jpg')
@@ -219,8 +219,9 @@ def main(img_path):
         # cv2.imshow('Contours', white_img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
-    # contours_after.pop(7)
-    # contours_after.pop(0)
+    for i in range(len(contours_after)-1,-1,-1):
+        if(i!=9):
+            contours_after.pop(i)
     # algorithmic([contours[15]], img.shape[:2])
     algorithmic(contours_after, img.shape[:2])
 

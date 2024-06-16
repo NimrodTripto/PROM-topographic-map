@@ -420,6 +420,14 @@ def algorithmic(contours, img_shape):
                 curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
                 print(f"curve is: {curvature}")
                 contour = close_open_contour(contour,img_shape,curvature,2)
+                plt.figure()
+                contour_points = contour.squeeze()
+                plt.scatter(contour_points[:, 0], contour_points[:, 1], label=f'this is Contour {0}')
+                plt.legend()
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                plt.title('All Contours')
+                plt.show()
                 redraw_dict[i] = contour
             if not is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
                 print("very bad")
