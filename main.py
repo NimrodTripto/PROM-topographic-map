@@ -219,10 +219,10 @@ def main(img_path):
         # cv2.imshow('Contours', white_img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
-    for i in range(len(contours_after)-1,-1,-1):
-        if(i==0):
-            contours_after.pop(i)
     # algorithmic([contours[15]], img.shape[:2])
+    # keep 9,8,0,7 for edge 4
+    # contours_after = [contours_after[9],contours_after[8],contours_after[11], contours_after[10]]
+    # contours_after = [contours_after[0], contours_after[3]]
     algorithmic(contours_after, img.shape[:2])
 
 

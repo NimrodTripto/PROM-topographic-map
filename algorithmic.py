@@ -4,20 +4,27 @@ import matplotlib.pyplot as plt
 import pyvista as pv
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
-from scipy.spatial import Delaunay
+from scipy.spatial import Delaunay, KDTree
 import matplotlib.path as mplPath
 from algorithmic_advancements import calculate_curvature_from_contour,close_open_contour
 import math
-from scipy.interpolate import griddata, RectBivariateSpline
+from scipy.interpolate import griddata, RectBivariateSpline, SmoothBivariateSpline
 from scipy.spatial.distance import cdist
+from algorithmic_advancements import THRESH_CLOSED
+from scipy.ndimage import gaussian_filter
+from scipy.optimize import curve_fit
+from matplotlib.path import Path
+from skimage.draw import polygon
+from scipy.ndimage import gaussian_filter
+import cv2
 
 
-MERGE_THRESH = 1.0
-DIFF = 60
-THRESH_CLOSED = 0
+MERGE_THRESH = 1
+DIFF = 15
 THRESH_EDGE = 3
 JUMP_EDGE = 1
 GRID_RES = 100
+SIGMA = 10
 
 
 def is_contour_closed2(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
@@ -70,13 +77,14 @@ def check_if_horrible_case(contour1, contour2, img_shape):
     if index >= len(contour2):
         return False
     point = (float(contour2[index][0][0]), float(contour2[index][0][1]))
+    # print(f"Point of contour 2 is {point}")
     # Take contour to right type
     contour1 = np.array(contour1, dtype=np.float32)
     if cv2.pointPolygonTest(contour1, point, False) == 1.0:
         flag2 = True
     return flag1 and flag2
 
-def merge_contours(contour1, contour2, tolerance=MERGE_THRESH):
+def merge_contours(contour1, contour2, img_shape, tolerance=MERGE_THRESH):
     """
     Merge two contours into one.
     :param contour1: numpy array of shape (N, 1, 2) representing the first contour
@@ -86,27 +94,39 @@ def merge_contours(contour1, contour2, tolerance=MERGE_THRESH):
     """
 
     # Get non-edge points
-    img_shape = (1500, 1500)  # Assuming the image shape, replace with actual if different
     non_edge_points1 = np.array([pt[0] for pt in contour1 if not is_close_to_edge(pt[0], img_shape)])
     non_edge_points2 = np.array([pt[0] for pt in contour2 if not is_close_to_edge(pt[0], img_shape)])
-    
+
+    # Get edge points
+    edge_points1 = np.array([pt[0] for pt in contour1 if is_close_to_edge(pt[0], img_shape)])
+    edge_points2 = np.array([pt[0] for pt in contour2 if is_close_to_edge(pt[0], img_shape)])
+
     # Find common points within tolerance
-    dist_matrix = cdist(non_edge_points1, non_edge_points2)
+    dist_matrix = cdist(edge_points1, edge_points2)
     common_points_mask = dist_matrix < tolerance
     common_points_idx1, common_points_idx2 = np.where(common_points_mask)
 
-    common_points = (non_edge_points1[common_points_idx1] + non_edge_points2[common_points_idx2]) / 2
+    # Merge common points by averaging them
+    common_points = (edge_points1[common_points_idx1] + edge_points2[common_points_idx2]) / 2
 
-    # Merge non-edge points and common points
+    # Combine the non-edge points and the merged common points
     merged_points = np.vstack((non_edge_points1, non_edge_points2, common_points))
-    
+
     # Remove duplicates by rounding and converting to a set
     merged_points = np.unique(np.round(merged_points), axis=0)
-    
-    # Compute the convex hull to get the outline of the merged contour
-    hull = cv2.convexHull(merged_points.astype(np.float32))
 
-    return hull
+    # Ensure the points form a valid contour by ordering them
+    ordered_points = merged_points[np.argsort(merged_points[:, 0])]
+
+    # Create the final merged contour
+    final_contour = ordered_points.reshape(-1, 1, 2).astype(np.float32)
+
+    # plot final contour as scatter
+    plt.figure()
+    plt.scatter(final_contour[:, 0, 0], final_contour[:, 0, 1], label='Merged Contour', s=10)
+    plt.show()
+
+    return final_contour
 
 def is_valid_contour_shape(array):
     """
@@ -176,7 +196,7 @@ def is_close_to_edge(point, img_shape, thresh=THRESH_EDGE):
     Returns:
     bool: True if the point is close to the edge, False otherwise.
     """
-    return math.fabs(point[0] - img_shape[0]) <= thresh or math.fabs(point[1] - img_shape[1]) <= thresh or point[0] <= thresh or point[1] <= thresh
+    return math.fabs(point[0] - img_shape[1]) <= thresh or math.fabs(point[1] - img_shape[0]) <= thresh or point[0] <= thresh or point[1] <= thresh
 
 def return_contained_contours(contour, all_contours, img_shape):
     contained_contours = []
@@ -211,7 +231,7 @@ def find_father_contour(contour, contour_index, contour_dict, father_contours, i
             raise ValueError(f"Other contour format is incorrect. Expected shape is (N, 1, 2). Got shape {other_contour.shape}")
         if i != contour_index:
             index = 0
-            while index < len(other_contour) and is_close_to_edge(other_contour[index][0], img_shape):
+            while index < len(contour) and is_close_to_edge(contour[index][0], img_shape):
                 index += JUMP_EDGE
 
             # Convert contours to the required type
@@ -323,7 +343,7 @@ def create_pyvista_mesh(contours_with_heights, diff=DIFF):
 
     return poly
 
-def create_continuous_pyvista_mesh(contours_with_heights, grid_res=GRID_RES):
+def create_continuous_pyvista_mesh(contours_with_heights, grid_res=100):
     # Collect all points from contours with their corresponding heights
     all_points = []
     for height, contour in contours_with_heights.values():
@@ -336,12 +356,19 @@ def create_continuous_pyvista_mesh(contours_with_heights, grid_res=GRID_RES):
     
     # Define the grid
     grid_x, grid_y = np.mgrid[
-        all_points[:, 0].min():all_points[:, 0].max():grid_res*1j, 
-        all_points[:, 1].min():all_points[:, 1].max():grid_res*1j
+        np.min(all_points[:, 0]):np.max(all_points[:, 0]):complex(grid_res), 
+        np.min(all_points[:, 1]):np.max(all_points[:, 1]):complex(grid_res)
     ]
 
-    # Interpolate the heights
+    # Interpolate the heights using 'linear' interpolation method
     grid_z = griddata(all_points[:, :2], all_points[:, 2], (grid_x, grid_y), method='linear')
+
+    # Handle NaNs in grid_z by filling with minimum height value
+    min_height = np.nanmin(grid_z)
+    grid_z = np.nan_to_num(grid_z, nan=min_height)
+
+    # Apply Gaussian filter to smooth the grid_z
+    grid_z = gaussian_filter(grid_z, sigma=1)
 
     # Create the StructuredGrid
     structured_grid = pv.StructuredGrid(grid_x, grid_y, grid_z)
@@ -413,7 +440,7 @@ def draw_and_extract_contours(contour_dict, img_shape, padding=100):
             continue
 
         # Extract contours from the image
-        extracted_contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        extracted_contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
         # Ensure only one contour is found
         if len(extracted_contours) != 1:
@@ -423,22 +450,116 @@ def draw_and_extract_contours(contour_dict, img_shape, padding=100):
         # Shift the contour back to its original position
         reprocessed_contours[i] = extracted_contours[0].astype(np.float32) - [shift_x, shift_y]
 
-        # Visualize the reprocessed contour
-        # plot_contours({i: reprocessed_contours[i]}, img_shape, f"Reprocessed Contour {i}")
+        # Visualize the reprocessed contour together with the original
+        # plot_contours({i: reprocessed_contours[i], i + 1: contour}, img_shape, f"Reprocessed Contour {i}")
 
     return reprocessed_contours
+
+def plot_contours_scatter(contours, img_shape, title):
+    plt.figure(figsize=(10, 8))
+    for i, contour in contours.items():
+        plt.scatter(contour[:, 0, 0], contour[:, 0, 1], label=f"Contour {i}")
+    plt.xlim([0, img_shape[1]])
+    plt.ylim([0, img_shape[0]])
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.title(title)
+    plt.legend()
+    plt.show()
 
 def plot_contours(contours, img_shape, title):
     plt.figure(figsize=(10, 8))
     for i, contour in contours.items():
         plt.plot(contour[:, 0, 0], contour[:, 0, 1], label=f"Contour {i}")
     plt.xlim([0, img_shape[1]])
-    plt.ylim([img_shape[0], 0])
+    plt.ylim([0, img_shape[0]])
     plt.gca().set_aspect('equal', adjustable='box')
     plt.title(title)
     plt.legend()
     plt.show()
 
+
+def is_valid_contour(contour):
+    """Check if the contour is valid for drawing."""
+    return contour is not None and len(contour) > 0 and contour.shape[0] > 2
+
+def adjust_contour_points(contour, img_shape, margin):
+    """Adjust contour points to ensure they are not too close to the image boundaries."""
+    h, w = img_shape
+    contour[:, 0, 0] = np.clip(contour[:, 0, 0], margin, w - margin)
+    contour[:, 0, 1] = np.clip(contour[:, 0, 1], margin, h - margin)
+    return contour.astype(int)
+
+def create_heatmap_blur_mesh(contours_with_heights, img_shape, grid_res=100, sigma=SIGMA, padding=5, margin=0.1):
+    # Expand the image size to handle edge cases
+    padded_img_shape = (img_shape[0] + 2 * padding, img_shape[1] + 2 * padding)
+    
+    # Create an empty image to draw the contours with padding
+    heatmap = np.zeros(padded_img_shape, dtype=np.float32)
+
+    # Draw filled contours and accumulate heights
+    for idx, (height, contour) in enumerate(contours_with_heights.values()):
+        print(f"Processing contour {idx} with height {height}")
+        if not is_valid_contour(contour):
+            print(f"Contour {idx} is empty or None or invalid")
+            continue
+        
+        if isinstance(contour, list):
+            contour = np.array(contour, dtype=np.int32)  # Convert to numpy array if necessary
+        
+        print(f"Original contour shape: {contour.shape}")
+        
+        # Adjust contour points to ensure they are not too close to the image boundaries
+        contour = adjust_contour_points(contour, img_shape, margin)
+        print(f"Adjusted contour shape: {contour.shape}")
+        
+        if contour.ndim == 2:
+            contour = contour[:, np.newaxis, :]  # Ensure it has the shape (n, 1, 2)
+        
+        if contour.ndim == 3 and contour.shape[1] == 1 and contour.shape[2] == 2:
+            # Offset the contour by the padding amount
+            contour += padding
+            mask = np.zeros(padded_img_shape, dtype=np.float32)
+            print(f"Contour after padding adjustment: {contour.shape}")
+            try:
+                if not is_valid_contour(contour):
+                    raise ValueError(f"Contour {idx} became invalid after padding adjustment.")
+                cv2.drawContours(mask, [contour], -1, color=height, thickness=cv2.FILLED)
+                heatmap += mask
+            except cv2.error as e:
+                print(f"Error drawing contour {idx}: {e}")
+                continue
+            except ValueError as ve:
+                print(ve)
+                continue
+        else:
+            print(f"Contour {idx} has unexpected shape: {contour.shape}")
+
+    # Apply Gaussian blur to the heatmap
+    heatmap_blurred = gaussian_filter(heatmap, sigma=sigma)
+
+    # Crop back to the original image size
+    heatmap_blurred = heatmap_blurred[padding:-padding, padding:-padding]
+
+    # Define the grid
+    x = np.linspace(0, img_shape[1], grid_res)
+    y = np.linspace(0, img_shape[0], grid_res)
+    grid_x, grid_y = np.meshgrid(x, y)
+    
+    # Interpolate heatmap values on the grid
+    grid_z = cv2.resize(heatmap_blurred, (grid_res, grid_res))
+
+    # Plot the heat map
+    plt.imshow(grid_z, extent=(0, img_shape[1], 0, img_shape[0]), origin='lower', cmap='jet', alpha=0.5)
+    plt.colorbar(label='Height')
+    plt.title('Heat Map of Contours with Gaussian Blur')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.show()
+
+    # Create the StructuredGrid for PyVista
+    structured_grid = pv.StructuredGrid(grid_x, grid_y, grid_z)
+
+    return structured_grid
 
 def algorithmic(contours, img_shape):
     # This function gets a list of contours in the "find contours" format, and makes the algorithmic part
@@ -453,6 +574,7 @@ def algorithmic(contours, img_shape):
     contour_dict = {}
     redraw_dict = {}
     unedited = {}
+    print(f"Img shape is {img_shape}")
 
     # for i, contour in enumerate(contours):
     #     # only add contours with more than 1 point
@@ -464,59 +586,61 @@ def algorithmic(contours, img_shape):
     #         all_contour_dict[i] = contour
 
     # for now
-    
+    # print contours
+    # plot_contours({i: contour for i, contour in enumerate(contours)}, img_shape, "All Contours")
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
         if len(contour) > 1:
             unedited[i] = contour
             if not is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
                 curvature = calculate_curvature_from_contour(contour, (img_shape[0] / 2, img_shape[1] / 2), i)
-                print(f"curve is: {curvature}")
                 # Added will be a list of [contour, added line, added line, ...]
                 added = close_open_contour(contour,img_shape,curvature,2)
                 # # Make added a numpy array of points only, where right now it's a list of [line, line, ...]
                 added = np.array([point for line in added[1:] for point in line])
-                # # add the lines to the contour with np concatenate
-                # contour = np.concatenate((contour, added), axis=0)
-                contour = added
-                # plt.figure()
-                # plt.scatter(contour_points[:, 0], contour_points[:, 1], label=f'this is Contour {0}')
-                # plt.legend()
-                # plt.xlabel('X')
-                # plt.ylabel('Y')
-                # plt.title('All Contours')
-                # plt.show()
+                # added = remove_non_edge_points(added, img_shape)
+                contour = np.concatenate((contour, added))
+                # Sort by x with numpy
+                contour = contour[np.argsort(contour[:, 0, 0])]
                 redraw_dict[i] = contour
             if not is_contour_closed2(contour, THRESH_CLOSED, img_shape[0], img_shape[1]):
                 print("very bad")
             contour_dict[i] = contour
-    
+
+    # plot_contours_scatter(contour_dict, img_shape, "All Contours")
+    # # merge unedited and redraw_dict
+    # merged = {}
+    # for i, contour in unedited.items():
+    #     merged[i] = contour
+    # for i, contour in redraw_dict.items():
+    #     merged[i + len(unedited)] = contour
+    # # plot_all_contours(unedited)
+    # plot_contours_scatter(merged, img_shape, "All Contours")
+
+    # plot_contours(contour_dict, img_shape, "All Contours")
+
     redraw_dict = draw_and_extract_contours(redraw_dict, img_shape)
     for i, contour in redraw_dict.items():
         contour_dict[i] = contour
 
-    # merge unedited and redraw_dict
-    merged = {}
-    for i, contour in unedited.items():
-        merged[i] = contour
-    for i, contour in redraw_dict.items():
-        merged[i + len(unedited)] = contour
-    # plot_all_contours(unedited)
-    plot_all_contours(merged)
-
+    # Handle the case of contours that contain each other
     # Create a set to keep track of contours that have been merged
     to_delete = set()
     to_merge = {}
+    # print(f"Indexes of contours are: {contour_dict.keys()}")
 
     for i, contour in contour_dict.items():
         if i in to_delete:
             continue
         for j, other_contour in contour_dict.items():
             if i != j and j not in to_delete and check_if_horrible_case(contour, other_contour, img_shape):
-                merged_contour = merge_contours(contour, other_contour)
+                print(f"Contours {i} and {j} are in a horrible case")
+                merged_contour = merge_contours(contour, other_contour, img_shape)
                 to_merge[i] = merged_contour
                 to_delete.add(j)
                 break
+    
+    # plot_contours(contour_dict, img_shape, "All Contours")
 
     # Update the dictionary with merged contours
     for i, merged_contour in to_merge.items():
@@ -525,6 +649,19 @@ def algorithmic(contours, img_shape):
     # Remove merged contours from the dictionary
     for j in to_delete:
         del contour_dict[j]
+
+    # print(f"Indexes of contours are: {contour_dict.keys()}")
+
+    # plot_contours_scatter(contour_dict, img_shape, "All Contours")
+
+    # redraw the contours that were merged
+    redraw_dict = draw_and_extract_contours(to_merge, img_shape)
+    for i, contour in redraw_dict.items():
+        contour_dict[i] = contour
+
+    # plot_contours_scatter(contour_dict, img_shape, "All Contours")
+
+    # print(f"Indexes of contours are: {contour_dict.keys()}")
 
     # print(f"Contour in number 0 is {closed_contour_dict[0]}")
 
@@ -541,9 +678,9 @@ def algorithmic(contours, img_shape):
 
     father_dict = generate_fathers_dict(contour_dict, img_shape)
 
-    print(f"Father dict is {father_dict}")
+    # print(f"Father dict is {father_dict}")
 
-    plot_all_contours(contour_dict)
+    plot_contours(contour_dict, img_shape, "All Contours")
 
     # translate father_dict to a dictionary of contour_index: height
     contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
@@ -555,14 +692,18 @@ def algorithmic(contours, img_shape):
 
     # zip the contours with their heights
     contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
+
+    plot_contours_scatter(contour_dict, img_shape, "All Contours")
     
     # create mesh
     mesh = create_pyvista_mesh(contour_with_heights)
     continuous_mesh = create_continuous_pyvista_mesh(contour_with_heights)
+    heat_map_mesh = create_heatmap_blur_mesh(contour_with_heights, img_shape)
 
     # plot the mesh
     plot_gradient_mesh(mesh)
     plot_gradient_mesh(continuous_mesh)
+    plot_gradient_mesh(heat_map_mesh)
 
     # draw contours with heights in 3D, using pyvista. Complete mesh between the contours
     # and plot the 3D model
