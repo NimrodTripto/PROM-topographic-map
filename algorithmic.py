@@ -122,9 +122,9 @@ def merge_contours(contour1, contour2, img_shape, tolerance=MERGE_THRESH):
     final_contour = ordered_points.reshape(-1, 1, 2).astype(np.float32)
 
     # plot final contour as scatter
-    plt.figure()
-    plt.scatter(final_contour[:, 0, 0], final_contour[:, 0, 1], label='Merged Contour', s=10)
-    plt.show()
+    # plt.figure()
+    # plt.scatter(final_contour[:, 0, 0], final_contour[:, 0, 1], label='Merged Contour', s=10)
+    # plt.show()
 
     return final_contour
 
@@ -573,7 +573,9 @@ def algorithmic(contours, img_shape):
 
     # for now
     # print contours
-    plot_contours({i: contour for i, contour in enumerate(contours)}, img_shape, "All Contours")
+    # plot_contours({i: contour for i, contour in enumerate(contours)}, img_shape, "All Contours")
+    # scatter plot
+    # plot_all_contours_scatter({i: contour for i, contour in enumerate(contours)})
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
         if len(contour) > 1:
@@ -667,7 +669,7 @@ def algorithmic(contours, img_shape):
     # print(f"Father dict is {father_dict}")
 
     # print(f"contour is: {contour_dict[0]}")
-    plot_contours(contour_dict, img_shape, "All Contours")
+    # plot_contours(contour_dict, img_shape, "All Contours")
 
     # translate father_dict to a dictionary of contour_index: height
     contour_heights = father_to_heights(father_dict, contour_dict)  # dict of the shape {contour_number: height}
@@ -680,7 +682,7 @@ def algorithmic(contours, img_shape):
     # zip the contours with their heights
     contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
 
-    plot_contours_scatter(contour_dict, img_shape, "All Contours")
+    # plot_contours_scatter(contour_dict, img_shape, "All Contours")
     print(f"num of contours is {len(contour_dict)}")
     
     # create mesh
