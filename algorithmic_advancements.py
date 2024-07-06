@@ -501,24 +501,24 @@ def calculate_curvature(input_data, smoothing_factor=SMOOTHING_FACTOR, option=0)
     else:
         nature = "sad"
 
-    # # Plotting the spline and its second derivative
-    # plt.figure()
-    # plt.plot(theta, r, 'o', label='Original Data')
-    # plt.plot(theta_dense, spline(theta_dense), label='Spline Fit')
-    # plt.xlabel('Theta (radians)')
-    # plt.ylabel('Radius (r)')
-    # plt.title('Spline Fit of the Data')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
+    # Plotting the spline and its second derivative
+    plt.figure()
+    plt.plot(theta, r, 'o', label='Original Data')
+    plt.plot(theta_dense, spline(theta_dense), label='Spline Fit')
+    plt.xlabel('Theta (radians)')
+    plt.ylabel('Radius (r)')
+    plt.title('Spline Fit of the Data')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
-    # plt.figure()
-    # plt.plot(theta_dense, second_derivative_values)
-    # plt.xlabel('Theta (radians)')
-    # plt.ylabel('Second Derivative of Radius')
-    # plt.title('Second Derivative of Radius vs. Theta')
-    # plt.grid(True)
-    # plt.show()
+    plt.figure()
+    plt.plot(theta_dense, second_derivative_values)
+    plt.xlabel('Theta (radians)')
+    plt.ylabel('Second Derivative of Radius')
+    plt.title('Second Derivative of Radius vs. Theta')
+    plt.grid(True)
+    plt.show()
 
     return total_curvature, nature
 

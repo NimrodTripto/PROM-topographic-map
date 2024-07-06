@@ -21,6 +21,7 @@ IMG1 = 'images\map_small.png'
 IMG1 = 'images\map_big.jpg'
 IMG = 'images\map_hand2.jpg'
 IMG1 = 'images\map2.jpg'
+SMALL_THRESHOLD = 10
 
 def image_to_contours(img):
     pass
@@ -133,7 +134,7 @@ def try_sample(contour,num_sample):
 def intersection_test2(contour1,contour2, threshold=10):
     # all_contour1_points = [pt[0] for pt in contour1]
     # contour1_points = try_sample(contour1,100)
-    contour2_points = try_sample(contour2,10)
+    contour2_points = try_sample(contour2,50)
     all_dists = []
     for pt_i in contour2_points:
         curr_dist = min(math.dist(contour1[pt_j][0],contour2[pt_i][0]) for pt_j in range(len(contour1)))
@@ -206,7 +207,7 @@ def main(img_path):
     # cv2.destroyAllWindows()
     contours = find_contours(curr_img)
     # plot every contour using cv
-    contours_after = remove_duplicate_contours(remove_small_contours(contours,10), 5)
+    contours_after = remove_duplicate_contours(remove_small_contours(contours, SMALL_THRESHOLD), 10)
     # contours_after = contours
     #i==4
     white_img = cv2.imread('images\white_img.jpg')
