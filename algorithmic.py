@@ -238,20 +238,6 @@ def find_father_contour(contour, contour_index, contour_dict, father_contours, i
             other_contour = np.array(other_contour, dtype=np.float32)
             contour_point = (float(contour[index][0][0]), float(contour[index][0][1]))
 
-            # if i == 11 and contour_index == 10:
-            #     print(f"Got to the point of checking if {contour_index} is a grandson of {i}")
-            #     print(f"my point is {contour_point}")
-            #     print(f"Point polygon test for {i} is {cv2.pointPolygonTest(other_contour, contour_point, False)}")
-            #     # take another point with 50 x to the left
-            #     other_point = (contour_point[0] - 250, contour_point[1])
-            #     print(f"Point polygon test for other point is {cv2.pointPolygonTest(other_contour, other_point, False)}")
-            #     # plot the point with the contour
-            #     plt.figure()
-            #     plt.plot(other_contour[:, 0, 0], other_contour[:, 0, 1])
-            #     plt.scatter(contour_point[0], contour_point[1], c='r')
-            #     plt.scatter(other_point[0], other_point[1], c='g')
-            #     plt.show()
-
             if cv2.pointPolygonTest(other_contour, contour_point, False) == 1.0:
                 if not am_i_grandson(contour_index, i, contour_dict, img_shape):
                     return i
@@ -680,6 +666,7 @@ def algorithmic(contours, img_shape):
 
     # print(f"Father dict is {father_dict}")
 
+    # print(f"contour is: {contour_dict[0]}")
     plot_contours(contour_dict, img_shape, "All Contours")
 
     # translate father_dict to a dictionary of contour_index: height
