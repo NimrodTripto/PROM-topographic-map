@@ -10,7 +10,7 @@ import pyvista as pv
 import os
 import sys
 import random
-from algorithmic import algorithmic
+from algorithmic import algorithmic,plot_contours
 import algorithmic_advancements
 import math
 import statistics
@@ -173,14 +173,14 @@ def remove_duplicate_contours(contours, threshold=10):
 def remove_small_contours(contours, threshold=100):
     # Indices of contours to be removed
     remove_indices = []
-    white_img = cv2.imread('images\white_img.jpg')
-    height, width = white_img.shape[:2]
-
+    
     # Compare each pair of contours
     for i in range(len(contours)):
         contour_area = cv2.contourArea(cv2.convexHull(contours[i]))
         if (contour_area<threshold):
                 remove_indices.append(i)
+        if(len(contours[i])<200):
+            remove_indices.append(i)
                 
 
     # print(remove_indices)
@@ -188,6 +188,12 @@ def remove_small_contours(contours, threshold=100):
     unique_contours = [contours[i] for i in range(len(contours)) if i not in remove_indices]
 
     return unique_contours
+
+def our_squeeze(contour):
+    new_contour = []
+    for c in contour:
+        new_contour.extend([[[p[0][0],p[0][1]]] if (len(p)==1) else [[p[0],p[1]]] for p in c])
+    return new_contour
 
 def main(img_path):
     img = get_image(img_path)
@@ -220,9 +226,15 @@ def main(img_path):
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
     # algorithmic([contours[15]], img.shape[:2])
+    # contours_after = [contours_after[0]]
+    contours_after = [np.array(our_squeeze(c)) for c in contours_after]
+    # print(contours_after)
+    # algorithmic([contours[15]], img.shape[:2])
     # keep 9,8,0,7 for edge 4
     # contours_after = [contours_after[9],contours_after[8],contours_after[11], contours_after[10]]
-    # contours_after = [contours_after[0], contours_after[3]]
+    # print(f"contour is: {contours_after[0]}")
+    # plot_contours({index: value for index, value in enumerate(contours_after)}, img.shape[:2], "All Contours")
+    # print(f"that was that")
     algorithmic(contours_after, img.shape[:2])
 
 
