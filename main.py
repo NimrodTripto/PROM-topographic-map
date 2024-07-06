@@ -218,9 +218,9 @@ def main(img_path):
             # print(contour)
             # print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
             cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-    cv2.imshow('Contours', white_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow('Contours', white_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     # else:
     #     for (i,contour) in enumerate(contours_after):
     #         cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
