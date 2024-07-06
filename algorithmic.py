@@ -20,7 +20,7 @@ import cv2
 
 
 MERGE_THRESH = 1
-DIFF = 15
+DIFF = 25
 THRESH_EDGE = 3
 JUMP_EDGE = 1
 GRID_RES = 100
@@ -498,7 +498,7 @@ def create_heatmap_blur_mesh(contours_with_heights, img_shape, grid_res=100, sig
 
     # Draw filled contours and accumulate heights
     for idx, (height, contour) in enumerate(contours_with_heights.values()):
-        print(f"Processing contour {idx} with height {height}")
+        # print(f"Processing contour {idx} with height {height}")
         if not is_valid_contour(contour):
             print(f"Contour {idx} is empty or None or invalid")
             continue
@@ -506,11 +506,11 @@ def create_heatmap_blur_mesh(contours_with_heights, img_shape, grid_res=100, sig
         if isinstance(contour, list):
             contour = np.array(contour, dtype=np.int32)  # Convert to numpy array if necessary
         
-        print(f"Original contour shape: {contour.shape}")
+        # print(f"Original contour shape: {contour.shape}")
         
         # Adjust contour points to ensure they are not too close to the image boundaries
         contour = adjust_contour_points(contour, img_shape, margin)
-        print(f"Adjusted contour shape: {contour.shape}")
+        # print(f"Adjusted contour shape: {contour.shape}")
         
         if contour.ndim == 2:
             contour = contour[:, np.newaxis, :]  # Ensure it has the shape (n, 1, 2)
@@ -574,7 +574,7 @@ def algorithmic(contours, img_shape):
     contour_dict = {}
     redraw_dict = {}
     unedited = {}
-    print(f"Img shape is {img_shape}")
+    # print(f"Img shape is {img_shape}")
 
     # for i, contour in enumerate(contours):
     #     # only add contours with more than 1 point
@@ -587,7 +587,7 @@ def algorithmic(contours, img_shape):
 
     # for now
     # print contours
-    # plot_contours({i: contour for i, contour in enumerate(contours)}, img_shape, "All Contours")
+    plot_contours({i: contour for i, contour in enumerate(contours)}, img_shape, "All Contours")
     for i, contour in enumerate(contours):
         # only add contours with more than 1 point
         if len(contour) > 1:
@@ -634,7 +634,7 @@ def algorithmic(contours, img_shape):
             continue
         for j, other_contour in contour_dict.items():
             if i != j and j not in to_delete and check_if_horrible_case(contour, other_contour, img_shape):
-                print(f"Contours {i} and {j} are in a horrible case")
+                # print(f"Contours {i} and {j} are in a horrible case")
                 merged_contour = merge_contours(contour, other_contour, img_shape)
                 to_merge[i] = merged_contour
                 to_delete.add(j)
@@ -694,15 +694,18 @@ def algorithmic(contours, img_shape):
     contour_with_heights = zip_contours_with_heights(contour_dict, contour_heights)
 
     plot_contours_scatter(contour_dict, img_shape, "All Contours")
+    print(f"num of contours is {len(contour_dict)}")
     
     # create mesh
     mesh = create_pyvista_mesh(contour_with_heights)
-    continuous_mesh = create_continuous_pyvista_mesh(contour_with_heights)
-    heat_map_mesh = create_heatmap_blur_mesh(contour_with_heights, img_shape)
+    # continuous_mesh = create_continuous_pyvista_mesh(contour_with_heights)
+    # Create heatmap mesh without outer contour (with index -1)
+    contours_with_heights_no_edge = {i: (height, contour) for i, (height, contour) in contour_with_heights.items() if i != -1}
+    heat_map_mesh = create_heatmap_blur_mesh(contours_with_heights_no_edge, img_shape)
 
     # plot the mesh
     plot_gradient_mesh(mesh)
-    plot_gradient_mesh(continuous_mesh)
+    # plot_gradient_mesh(continuous_mesh)
     plot_gradient_mesh(heat_map_mesh)
 
     # draw contours with heights in 3D, using pyvista. Complete mesh between the contours

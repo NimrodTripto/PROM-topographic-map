@@ -19,7 +19,7 @@ BIN_SIZE = 0.01  # in radians
 STRAIGHT_SIZE = 0.2
 SAME_LINE_THRESH = 20
 BREAK_PARAMETER = 0.3
-SMOOTHING_FACTOR = 700
+SMOOTHING_FACTOR = 300
 
 # # types: 1 - only one face touched, 2 - two adjacent faces touched, 3 - two nonAdjacent faces touched
 # def contour_type(contour, thresh=THRESH_CLOSED, X_MAX=1000, Y_MAX=1000):
