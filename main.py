@@ -21,7 +21,7 @@ IMG1 = 'images\map_small.png'
 IMG1 = 'images\map_big.jpg'
 IMG = 'images\map_hand2.jpg'
 IMG1 = 'images\map2.jpg'
-SMALL_THRESHOLD = 10
+SMALL_THRESHOLD = 400
 
 def image_to_contours(img):
     pass
@@ -180,7 +180,7 @@ def remove_small_contours(contours, threshold=100):
         contour_area = cv2.contourArea(cv2.convexHull(contours[i]))
         if (contour_area<threshold):
                 remove_indices.append(i)
-        if(len(contours[i])<200):
+        if(len(contours[i])<35):
             remove_indices.append(i)
                 
 
@@ -208,18 +208,19 @@ def main(img_path):
     contours = find_contours(curr_img)
     # plot every contour using cv
     contours_after = remove_duplicate_contours(remove_small_contours(contours, SMALL_THRESHOLD), 10)
+    contours_after = remove_small_contours(contours_after, SMALL_THRESHOLD)
     # contours_after = contours
     #i==4
     white_img = cv2.imread('images\white_img.jpg')
     # if(DEBUG):
-    #     for (i,contour) in enumerate(contours_after):
-    #         if(i==0 or i==7):
-    #             # print(contour)
-    #             # print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
-    #             cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
-    #     cv2.imshow('Contours', white_img)
-    #     cv2.waitKey(0)
-    #     cv2.destroyAllWindows()
+    for (i,contour) in enumerate(contours_after):
+        if(i%2==0 or i%2==1):
+            # print(contour)
+            # print(algorithmic_advancements.contour_to_r_theta(contour,[500,500]))
+            cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
+    cv2.imshow('Contours', white_img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     # else:
     #     for (i,contour) in enumerate(contours_after):
     #         cv2.drawContours(white_img, contour, -1, tuple(random.randint(0, 255) for _ in range(3)), 3)
